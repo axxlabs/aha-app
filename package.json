@@ -7,9 +7,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && vite build -c vite.sw.config.ts",
     "test": "vitest run",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "preview": "vite preview --host 127.0.0.1 --port 4173"
   },
   "dependencies": {
     "@noble/ciphers": "2.4.0",

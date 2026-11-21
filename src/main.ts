@@ -98,6 +98,7 @@ async function pairingScreen(store: Store): Promise<void> {
     h("h1", {}, `Hi ${data.name}`),
     h("p", {}, `This connects this device to Aha! on “${data.home}”. Everything you write is end-to-end encrypted to that computer.`),
     existing ? h("p", { class: "error" }, "This device is already paired; pairing again replaces it.") : "",
+    h("p", { class: "fine" }, `Through the gateway ${new URL(data.gw).host}. Only pair with a QR code your own computer showed you.`),
     h("label", { class: "fine" }, "Name of this device"),
     nameInput,
     button,
@@ -310,7 +311,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     item(it, live) {
       const stick = atBottom();
       place(it, "end");
-      if (live && it.t === "msg" && it.role === "aha") setBusy(false);
+      // A reply, or a card waiting for you: Aha! isn't working on its own any more (SPEC §3.3).
+      if (live && ((it.t === "msg" && it.role === "aha") || it.t === "approval")) setBusy(false);
       if (stick || live) toBottom();
     },
     typing(on) {

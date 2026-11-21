@@ -160,3 +160,36 @@ describe("AHA-PQ v1", () => {
     writeFileSync(new URL("./vectors/from_ts.json", import.meta.url), JSON.stringify(vectors, null, 1) + "\n");
   });
 });
+
+describe("fuzz", () => {
+  it("rejects random and mutated boxes without changing state", () => {
+    const { alice, bob } = pairInTs();
+    const good = alice.encrypt(enc.encode('{"t":"say"}'));
+    const before = JSON.stringify(bob.toJSON());
+    let seed = 42;
+    const rnd = (n: number) => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed % n;
+    };
+    for (let i = 0; i < 300; i++) {
+      let bad: Uint8Array;
+      if (i % 3 === 0) bad = c.randomBytes(rnd(3000));
+      else {
+        bad = good.slice();
+        for (let k = 0; k <= rnd(6); k++) bad[rnd(bad.length)] ^= 1 << rnd(8);
+        if (i % 5 === 0) bad = bad.slice(0, rnd(bad.length));
+      }
+      if (c.equal(bad, good)) continue;
+      expect(() => bob.decrypt(bad)).toThrow(c.CryptoError);
+      expect(JSON.stringify(bob.toJSON())).toBe(before);
+    }
+    expect(new TextDecoder().decode(bob.decrypt(good))).toBe('{"t":"say"}');
+  });
+
+  it("rejects malformed pairing links", async () => {
+    const { parsePairLink } = await import("../src/client");
+    for (const bad of ["", "#pair=", "#pair=!!!", "#x=abc", "#pair=" + btoa('{"v":1,"gw":"javascript:alert(1)"}').replace(/=/g, "")]) {
+      expect(() => parsePairLink(bad)).toThrow();
+    }
+  });
+});

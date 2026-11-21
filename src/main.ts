@@ -177,7 +177,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const col = h("div", { class: "col" });
   const scroller = h("main", { class: "chat" }, col);
   const working = h("div", { class: "working", hidden: "", role: "status" }, h("i"), h("i"), h("i"), " Aha! is working…");
-  const input = h("textarea", { rows: "1", placeholder: "Ask Aha! anything", "aria-label": "Message", maxlength: "20000" }) as HTMLTextAreaElement;
+  const input = h("textarea", { rows: "1", placeholder: "Ask Aha! anything", "aria-label": "Message", enterkeyhint: "enter", maxlength: "20000" }) as HTMLTextAreaElement;
   const sendBtn = h("button", { class: "send", type: "submit", "aria-label": "Send" }, icon(ICONS.send));
   const form = h("form", {}, input, sendBtn);
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
@@ -411,7 +411,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   };
   input.addEventListener("input", grow);
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    // Enter is a new line (SPEC §7.4); the send button or Ctrl/Cmd+Enter sends.
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.isComposing) {
       e.preventDefault();
       form.requestSubmit();
     }

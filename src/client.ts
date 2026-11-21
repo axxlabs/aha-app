@@ -41,6 +41,7 @@ export interface Identity {
   keys: Record<"ikPriv" | "ikPub" | "kemSeed" | "kemPub" | "sigPriv" | "sigPub", string>;
   pushKey: string;
   cert: Cert;
+  fp?: string; // the computer's fingerprint (base64url SHA-256 of IKc ‖ KEMc), from the pairing link
 }
 
 export interface Settings {
@@ -55,9 +56,37 @@ export function parsePairLink(hash: string): PairData {
   const m = /^#pair=([A-Za-z0-9_-]+)$/.exec(hash);
   if (!m) throw new Error("This isn't a pairing link.");
   const data = JSON.parse(new TextDecoder().decode(c.b64urlDecode(m[1]))) as PairData;
-  if (data.v !== 1 || !/^wss?:\/\//.test(data.gw) || !data.code || !data.psk || !data.fp || !data.pin)
+  if (data.v !== 1 || !data.code || !data.psk || !data.fp || !data.pin || typeof data.gw !== "string")
     throw new Error("This pairing link is incomplete.");
+  // wss:// only; plain ws:// just for a gateway on this same machine, in development (SPEC §6.4).
+  const url = new URL(data.gw);
+  const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol !== "wss:" && !(url.protocol === "ws:" && local)) throw new Error("This pairing link doesn't use a secure connection.");
   return data;
+}
+
+/** What people compare with `aha status` (SPEC §6.4): 16 base32 characters of the fingerprint, in groups of 4. */
+export function shortFingerprint(fpB64url: string): string {
+  const bytes = c.b64urlDecode(fpB64url);
+  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0, value = 0, out = "";
+  for (const b of bytes) {
+    value = (value << 8) | b;
+    bits += 8;
+    while (bits >= 5 && out.length < 16) {
+      out += A[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+    if (out.length >= 16) break;
+  }
+  return out.match(/.{4}/g)!.join(" ");
+}
+
+const proofContext = "aha-gateway-v1|";
+
+/** The gateway proves it holds the pinned key by signing our nonce (SPEC §6.3). */
+export function gatewayProved(pin: string, nonce: string, sig: unknown): boolean {
+  return typeof sig === "string" && c.verify(c.b64d(pin, 32), enc.encode(proofContext + nonce), c.b64d(sig));
 }
 
 function certBody(cert: Cert): Uint8Array {
@@ -83,6 +112,8 @@ export function pair(data: PairData, deviceName = defaultDeviceName()): Promise<
     const ws = new WebSocket(data.gw);
     let fin: ReturnType<typeof c.deviceFinish> | null = null;
     let keys: c.DeviceKeys | null = null;
+    let proved = false;
+    const nonce = c.b64e(c.randomBytes(32));
     const fail = (msg: string) => {
       ws.close();
       reject(new Error(msg));
@@ -99,9 +130,14 @@ export function pair(data: PairData, deviceName = defaultDeviceName()): Promise<
       try {
         if (f.t === "hello") {
           if (f.gateway !== data.pin) return fail("The gateway's key doesn't match the pairing link.");
-          ws.send(JSON.stringify({ t: "pair_hello", code: data.code }));
+          ws.send(JSON.stringify({ t: "pair_hello", code: data.code, nonce }));
+        } else if (f.t === "ready") {
+          if (!gatewayProved(data.pin, nonce, f.sig)) return fail("The gateway couldn't prove it holds the key in the pairing link.");
+          proved = true;
         } else if (f.t === "notice") {
           return fail(f.code === "pair_unknown" ? "This pairing link has expired or was already used. Run `aha pair` again." : "Pairing was refused.");
+        } else if (f.t === "pair" && !proved) {
+          return fail("The gateway didn't prove its key before pairing.");
         } else if (f.t === "pair" && f.body?.t === "bundle") {
           keys = c.generateDeviceKeys();
           fin = c.deviceFinish(f.body, c.b64urlDecode(data.fp), c.b64urlDecode(data.psk), keys);
@@ -124,6 +160,7 @@ export function pair(data: PairData, deviceName = defaultDeviceName()): Promise<
             },
             pushKey: c.b64e(fin.pk.pushKey),
             cert,
+            fp: data.fp,
           };
           clearTimeout(timer);
           ws.close();
@@ -160,6 +197,7 @@ export class Client {
   private retry = 1000;
   private stopped = false;
   private helloSent = false;
+  private nonce = "";
 
   constructor(
     private store: Store,
@@ -215,11 +253,18 @@ export class Client {
           return this.on.error("pin");
         }
         this.vapid = f.vapid || "";
+        this.nonce = c.b64e(c.randomBytes(32));
         const sig = c.sign(c.b64d(this.identity.keys.sigPriv, 32), enc.encode(`aha-device-v1|${f.nonce}|${this.dev}`));
-        this.ws?.send(JSON.stringify({ t: "dev_auth", cert: this.identity.cert, sig: c.b64e(sig) }));
+        this.ws?.send(JSON.stringify({ t: "dev_auth", cert: this.identity.cert, sig: c.b64e(sig), nonce: this.nonce }));
         break;
       }
       case "ready":
+        if (!gatewayProved(this.identity.pin, this.nonce, f.sig)) {
+          // Something answers for the gateway's name without its key: don't talk to it (SPEC §6.3).
+          this.stopped = true;
+          this.ws?.close();
+          return this.on.error("pin");
+        }
         this.connected = true;
         await this.setComputer(!!f.online);
         break;

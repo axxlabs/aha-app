@@ -5,7 +5,7 @@
 
 import "./style.css";
 import { THEMES, applyTheme } from "./themes";
-import { APP_VERSION, Client, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
+import { APP_VERSION, Client, shortFingerprint, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { Ratchet, type RatchetState, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
 import { type Item, Store } from "./store";
@@ -92,15 +92,31 @@ async function pairingScreen(store: Store): Promise<void> {
   // The secret must not stay in the address bar or the history.
   history.replaceState(null, "", location.pathname);
   const existing = await store.get<Identity>("identity");
+  // A link for a different computer than the one this device is paired with (SPEC §6.4).
+  const different = !!existing && (existing.fp ? existing.fp !== data.fp : existing.gw !== data.gw || existing.home !== data.home);
+  const confirmInput = h("input", { type: "text", maxlength: "60", "aria-label": "Type the computer's name to confirm" }) as HTMLInputElement;
   const button = h("button", { class: "primary", type: "button" }, `Pair with ${data.home} as ${data.name}`);
+  if (different) {
+    button.setAttribute("disabled", "");
+    confirmInput.addEventListener("input", () => button.toggleAttribute("disabled", confirmInput.value.trim() !== data.home));
+  }
   const nameInput = h("input", { type: "text", maxlength: "60", value: defaultName(), "aria-label": "Name of this device" }) as HTMLInputElement;
   const msg = h("p", {});
   screen(
     mark(),
     h("h1", {}, `Hi ${data.name}`),
     h("p", {}, `This connects this device to Aha! on “${data.home}”. Everything you write is end-to-end encrypted to that computer.`),
-    existing ? h("p", { class: "error" }, "This device is already paired; pairing again replaces it.") : "",
-    h("p", { class: "fine" }, `Through the gateway ${new URL(data.gw).host}. Only pair with a QR code your own computer showed you.`),
+    existing && !different ? h("p", { class: "error" }, "This device is already paired; pairing again replaces it.") : "",
+    different
+      ? h(
+          "div",
+          { class: "warn-box" },
+          h("p", {}, h("b", {}, `This isn't your computer “${existing!.home}”.`), ` If someone sent you this link, don't pair: they would receive everything you write.`),
+          h("label", { class: "fine" }, `To pair with “${data.home}” anyway, type its name:`),
+          confirmInput,
+        )
+      : "",
+    h("p", { class: "fine" }, `Through the gateway ${new URL(data.gw).host}. Computer fingerprint ${shortFingerprint(data.fp)} (\`aha status\` shows it). Only pair with a QR code your own computer showed you.`),
     h("label", { class: "fine" }, "Name of this device"),
     nameInput,
     button,
@@ -163,8 +179,14 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const input = h("textarea", { rows: "1", placeholder: "Ask Aha! anything", "aria-label": "Message", maxlength: "20000" }) as HTMLTextAreaElement;
   const sendBtn = h("button", { class: "send", type: "submit", "aria-label": "Send" }, icon(ICONS.send));
   const form = h("form", {}, input, sendBtn);
+  // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
+  const installHint = h("div", { class: "banner" }, "Add Aha! to your Home Screen (Share → Add to Home Screen). Otherwise Safari may delete this pairing after 7 days without a visit.");
+  installHint.hidden = !ios || installed;
   app.replaceChildren(
     h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, menu)),
+    installHint,
     banner,
     scroller,
     h("footer", { class: "composer" }, form),
@@ -547,6 +569,17 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
       ),
       h("section", {}, h("h4", {}, "Colour"), swatches),
       h("section", {}, h("h4", {}, "Help"), h("div", { class: "row" }, h("span", {}, "Report a problem", h("small", {}, "You choose what's shared, and see it before it's sent.")), reportBtn)),
+      h(
+        "section",
+        {},
+        h("h4", {}, "Your computer"),
+        h(
+          "div",
+          { class: "row" },
+          h("span", {}, client.identity.home, h("small", {}, client.identity.fp ? "Fingerprint: compare with `aha status` on your computer." : "Pair again to see its fingerprint.")),
+          h("code", { class: "fp" }, client.identity.fp ? shortFingerprint(client.identity.fp) : "—"),
+        ),
+      ),
       h("p", { class: "fine" }, `Aha! ${APP_VERSION} (${BUILD}) · end-to-end encrypted (AHA-PQ v1) · `, h("a", { href: "https://github.com/axxlabs/aha-app", target: "_blank", rel: "noopener noreferrer" }, "source (AGPL-3.0)")),
     ),
   ) as HTMLDialogElement;

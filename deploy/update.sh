@@ -7,7 +7,7 @@
 set -euo pipefail
 SRC="${AHA_APP_SRC:-/opt/aha-app/src}"
 SITE="${AHA_APP_SITE:-/srv/aha-app}"
-NODE_IMAGE="docker.io/library/node:22-slim"
+NODE_IMAGE="docker.io/library/node@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee"  # node:22-slim, pinned
 
 cd "$SRC"
 git fetch -q origin main

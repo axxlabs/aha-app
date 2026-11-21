@@ -4,6 +4,7 @@
 // The Aha! app (SPEC §7.4): one GPT-style conversation with your own computer, end-to-end encrypted.
 
 import "./style.css";
+import { THEMES, applyTheme } from "./themes";
 import { APP_VERSION, Client, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { Ratchet, type RatchetState, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
@@ -63,6 +64,7 @@ async function boot(): Promise<void> {
     return;
   }
   const store = await Store.open();
+  applyTheme((await store.get<Settings>("settings"))?.theme);
   if (location.hash.startsWith("#pair=")) return pairingScreen(store);
   const identity = await store.get<Identity>("identity");
   if (!identity) return welcomeScreen();
@@ -338,6 +340,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     devices(list) {
       settingsUi?.showDevices(list);
     },
+    report(msg) {
+      settingsUi?.onReport(msg);
+    },
     error(code) {
       if (code === "other_tab") screen(mark(), h("h1", {}, "Aha! is open somewhere else"), h("p", {}, "This device connected again from another tab or window."));
       if (code === "pin") screen(mark(), h("h1", {}, "Gateway key changed"), h("p", { class: "error" }, "The gateway's key no longer matches the one from pairing, so Aha! won't connect. Pair this device again."));
@@ -414,6 +419,84 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 interface SettingsUi {
   showMemories(list: { id: string; text: string }[]): void;
   showDevices(list: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
+  onReport(msg: { t: string; id: string; text?: string; ok?: boolean; code?: string }): void;
+}
+
+const REPORT_ERRORS: Record<string, string> = {
+  reports_off: "This gateway doesn't take problem reports.",
+  rate_limited: "Too many reports for now. Please try again in an hour.",
+  expired: "That preview expired. Please preview it again.",
+  gateway_unreachable: "Couldn't reach the gateway. Please try again.",
+};
+
+/** Settings → Report a problem (SPEC §7.7): preview the exact text from the computer, then send it on request. */
+function reportView(client: Client, back: () => void) {
+  const note = h("textarea", { rows: "3", maxlength: "2000", placeholder: "What went wrong? (optional)", "aria-label": "What went wrong" }) as HTMLTextAreaElement;
+  const count = h("select", { "aria-label": "How many of the latest messages to include" }) as HTMLSelectElement;
+  for (const n of [1, 2, 4, 6, 10, 20]) {
+    const o = h("option", { value: String(n) }, `The last ${n} message${n > 1 ? "s" : ""}`) as HTMLOptionElement;
+    if (n === 4) o.selected = true;
+    count.append(o);
+  }
+  const details = h("input", { type: "checkbox", id: "report-details" }) as HTMLInputElement;
+  const status = h("p", { class: "fine" });
+  const previewBtn = h("button", { class: "btn", type: "button" }, "Preview the report");
+  const sendBtn = h("button", { class: "btn primary", type: "button", hidden: "" }, "Send to Axxlabs");
+  const draft = h("pre", { class: "report-draft", hidden: "" });
+  const backBtn = h("button", { class: "btn", type: "button" }, "Back");
+  let draftId = "";
+  const el = h(
+    "section",
+    {},
+    h("h4", {}, "Report a problem"),
+    h("p", { class: "fine" }, "Send Axxlabs the latest messages so we can see what went wrong. You'll see exactly what's sent before anything leaves your computer."),
+    note,
+    h("div", { class: "row" }, h("span", {}, "Include"), count),
+    h("label", { class: "row", for: "report-details" }, h("span", {}, "Include technical details", h("small", {}, "The searches, pages and tools Aha! used for these messages. Helps us find the problem.")), details),
+    draft,
+    h("p", { class: "fine", hidden: "" }, "Only the text above is sent. It goes to Axxlabs as a private report, without your name or account, and is deleted once we've dealt with it (at most 90 days)."),
+    status,
+    h("div", { class: "row" }, backBtn, h("span", {}, previewBtn, " ", sendBtn)),
+  );
+  const consent = el.querySelector("p[hidden]") as HTMLElement;
+  const reset = () => {
+    draftId = "";
+    draft.hidden = sendBtn.hidden = consent.hidden = true;
+    previewBtn.textContent = "Preview the report";
+  };
+  for (const input of [note, count, details]) input.addEventListener("input", reset);
+  previewBtn.onclick = async () => {
+    status.textContent = "";
+    const ok = await client.send({ t: "report_preview", count: Number(count.value), note: note.value, details: details.checked, app: APP_VERSION });
+    status.textContent = ok ? "Asking your computer for the report…" : "Your computer is offline. Reports are built there, so try again when it's online.";
+  };
+  sendBtn.onclick = async () => {
+    if (!draftId) return;
+    sendBtn.disabled = true;
+    status.textContent = (await client.send({ t: "report_send", id: draftId })) ? "Sending…" : "Your computer is offline.";
+  };
+  backBtn.onclick = back;
+  return {
+    el,
+    onReport(msg: { t: string; id: string; text?: string; ok?: boolean; code?: string }) {
+      if (msg.t === "report_draft") {
+        draftId = msg.id;
+        draft.textContent = msg.text ?? "";
+        draft.hidden = sendBtn.hidden = consent.hidden = false;
+        sendBtn.disabled = false;
+        previewBtn.textContent = "Preview again";
+        status.textContent = "";
+      } else if (msg.t === "report_sent" && msg.id === draftId) {
+        if (msg.ok) {
+          el.replaceChildren(h("h4", {}, "Report a problem"), h("p", {}, "Thank you. Your report was sent."), h("div", { class: "row" }, backBtn));
+        } else {
+          status.textContent = REPORT_ERRORS[msg.code ?? ""] ?? "The report couldn't be sent. Please try again later.";
+          sendBtn.disabled = false;
+          if (msg.code === "expired") reset();
+        }
+      }
+    },
+  };
 }
 
 function openSettings(store: Store, client: Client, onClose: () => void): SettingsUi {
@@ -429,6 +512,21 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   const notify = h("button", { class: "btn", type: "button" }, client.settings.notifications ? "On" : "Turn on");
   const clearBtn = h("button", { class: "btn", type: "button" }, "Clear");
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
+  const reportBtn = h("button", { class: "btn", type: "button" }, "Report");
+  const swatches = h("div", { class: "swatches", role: "radiogroup", "aria-label": "Colour" });
+  for (const t of THEMES) {
+    const dot = h("i");
+    dot.style.background = t.swatch; // CSSOM, which the CSP allows (no inline style attributes)
+    const b = h("button", { class: "swatch", type: "button", role: "radio", "aria-checked": String(t.id === client.settings.theme) }, dot, t.name);
+    b.onclick = async () => {
+      for (const o of swatches.children) o.setAttribute("aria-checked", String(o === b));
+      applyTheme(t.id);
+      client.settings = { ...client.settings, theme: t.id };
+      await store.put("settings", client.settings);
+    };
+    swatches.append(b);
+  }
+  let report: ReturnType<typeof reportView> | null = null;
   const dialog = h(
     "dialog",
     { class: "sheet", "aria-label": "Settings" },
@@ -447,6 +545,8 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         h("div", { class: "row" }, h("span", {}, "Clear this device's cache"), clearBtn),
         h("div", { class: "row" }, h("span", {}, "Unpair this device", h("small", {}, "Deletes its keys and cached messages.")), unpair),
       ),
+      h("section", {}, h("h4", {}, "Colour"), swatches),
+      h("section", {}, h("h4", {}, "Help"), h("div", { class: "row" }, h("span", {}, "Report a problem", h("small", {}, "You choose what's shared, and see it before it's sent.")), reportBtn)),
       h("p", { class: "fine" }, `Aha! ${APP_VERSION} (${BUILD}) · end-to-end encrypted (AHA-PQ v1) · `, h("a", { href: "https://github.com/axxlabs/aha-app", target: "_blank", rel: "noopener noreferrer" }, "source (AGPL-3.0)")),
     ),
   ) as HTMLDialogElement;
@@ -489,6 +589,17 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     await client.send({ t: "hello", name: client.identity.deviceName, version: APP_VERSION, push: sub.toJSON() });
     notify.textContent = "On";
   };
+  const inner = dialog.querySelector(".sheet-in") as HTMLElement;
+  reportBtn.onclick = () => {
+    const sections = [...inner.children].slice(1) as HTMLElement[];
+    for (const s of sections) s.hidden = true;
+    report = reportView(client, () => {
+      report?.el.remove();
+      report = null;
+      for (const s of sections) s.hidden = false;
+    });
+    inner.append(report.el);
+  };
   unpair.onclick = async () => {
     if (!confirm("Unpair this device? Its keys and cached messages will be deleted.")) return;
     await client.send({ t: "revoke_device", device: client.dev });
@@ -498,6 +609,9 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   };
 
   return {
+    onReport(msg) {
+      report?.onReport(msg);
+    },
     showMemories(list) {
       memories.replaceChildren(
         ...(list.length ? list.map((m) => h("div", { class: "row" }, h("span", {}, m.text))) : [h("p", { class: "fine" }, "Nothing yet.")]),

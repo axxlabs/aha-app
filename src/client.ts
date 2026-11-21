@@ -46,9 +46,10 @@ export interface Identity {
 export interface Settings {
   keepDays: number; // 30, 7, 1 or 0 (don't keep)
   notifications: boolean;
+  theme: string; // a colour theme id (themes.ts)
 }
 
-export const DEFAULT_SETTINGS: Settings = { keepDays: 30, notifications: false };
+export const DEFAULT_SETTINGS: Settings = { keepDays: 30, notifications: false, theme: "saffron-hour" };
 
 export function parsePairLink(hash: string): PairData {
   const m = /^#pair=([A-Za-z0-9_-]+)$/.exec(hash);
@@ -146,6 +147,7 @@ export interface Events {
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   error(code: string): void;
   revoked(): void;
+  report(msg: { t: "report_draft" | "report_sent"; id: string; text?: string; ok?: boolean; code?: string }): void;
 }
 
 /** The authenticated connection and the end-to-end session with the computer. */
@@ -295,6 +297,10 @@ export class Client {
           this.identity = { ...this.identity, cert: msg.cert };
           await this.store.put("identity", this.identity);
         }
+        break;
+      case "report_draft":
+      case "report_sent":
+        this.on.report(msg as never);
         break;
       case "error":
         this.on.error(String(msg.code));

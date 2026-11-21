@@ -6,9 +6,9 @@
 import "./style.css";
 import { APPEARANCES, THEMES, applyTheme } from "./themes";
 import { APP_VERSION, Client, shortFingerprint, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
-import { Ratchet, type RatchetState, b64urlDecode } from "./crypto";
+import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
-import { type Item, Store } from "./store";
+import { type Item, type Photo, Store } from "./store";
 
 declare const __BUILD__: string;
 const BUILD = typeof __BUILD__ === "string" ? __BUILD__ : "dev";
@@ -45,7 +45,25 @@ const ICONS = {
   menu: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  photo: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
 };
+
+// A photo for Aha! (SPEC §7.4): at most 1600 px on its longest side, re-encoded as JPEG, which also drops its
+// location and other metadata; smaller again if it's still over ~900 kB.
+async function shrinkPhoto(file: File): Promise<Photo> {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  for (const [side, quality] of [[1600, 0.85], [1280, 0.75], [1024, 0.7]] as const) {
+    const scale = Math.min(1, side / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d")?.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", quality));
+    if (!blob) break;
+    if (blob.size <= 900_000) return { mime: "image/jpeg", b64: b64e(new Uint8Array(await blob.arrayBuffer())) };
+  }
+  throw new Error("photo too large");
+}
 
 function mark(): HTMLElement {
   return h("div", { class: "mark", "aria-label": "Aha!" }, h("span", {}, "ah"), h("span", { class: "a" }, "a"));
@@ -179,7 +197,11 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const working = h("div", { class: "working", hidden: "", role: "status" }, h("i"), h("i"), h("i"), " Aha! is working…");
   const input = h("textarea", { rows: "1", placeholder: "Ask Aha! anything", "aria-label": "Message", enterkeyhint: "enter", maxlength: "20000" }) as HTMLTextAreaElement;
   const sendBtn = h("button", { class: "send", type: "submit", "aria-label": "Send" }, icon(ICONS.send));
-  const form = h("form", {}, input, sendBtn);
+  const photoBtn = h("button", { class: "attach", type: "button", "aria-label": "Add a photo" }, icon(ICONS.photo));
+  const fileInput = h("input", { type: "file", accept: "image/*", hidden: "" }) as HTMLInputElement;
+  const attachment = h("div", { class: "attachment", hidden: "" });
+  let photo: Photo | null = null;
+  const form = h("form", {}, photoBtn, fileInput, input, sendBtn);
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
@@ -190,7 +212,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     installHint,
     banner,
     scroller,
-    h("footer", { class: "composer" }, form),
+    h("footer", { class: "composer" }, attachment, form),
   );
 
   const items = new Map<number, Item>();
@@ -208,7 +230,12 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   }
 
   function node(it: Item): HTMLElement | null {
-    if (it.t === "msg" && it.role === "me") return h("div", { class: "me" }, String(it.text ?? ""));
+    if (it.t === "msg" && it.role === "me") {
+      const el = h("div", { class: "me" }, String(it.text ?? ""));
+      const img = it.image as { mime?: string; b64?: string } | undefined;
+      if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.prepend(h("img", { class: "photo", alt: "Your photo", src: `data:${img.mime};base64,${img.b64}` }));
+      return el;
+    }
     if (it.t === "msg") {
       const el = h("div", { class: "aha" });
       el.innerHTML = render(String(it.text ?? "")); // markdown-it with html disabled (src/markdown.ts)
@@ -263,7 +290,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const stateEl = h("div", { class: "state" });
     const actions = h("div", { class: "actions" });
     const icon =
-      it.kind === "memory" || it.kind === "forget" ? "🧠" : it.kind === "email" || it.kind === "draft" ? "✉️" : it.kind === "signin" ? "🔑" : "✋";
+      it.kind === "memory" || it.kind === "forget" ? "🧠" : it.kind === "email" || it.kind === "draft" ? "✉️" : it.kind === "signin" ? "🔑" : it.kind === "schedule" ? "⏰" : "✋";
     const card = h("article", { class: "card" }, h("h3", {}, `${icon} ${String(it.title)}`));
     const img = it.image as { mime?: string; b64?: string } | undefined;
     if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) card.append(h("img", { alt: "Screenshot of the page", src: `data:${img.mime};base64,${img.b64}` }));
@@ -376,7 +403,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // or a second tap on Send never cancels the message just sent (SPEC §7.4).
   const STOP_GRACE = 1500;
   let lastSend = 0;
-  const stopMode = () => busy && !input.value.trim() && Date.now() - lastSend >= STOP_GRACE;
+  const stopMode = () => busy && !input.value.trim() && !photo && Date.now() - lastSend >= STOP_GRACE;
   function setBusy(on: boolean): void {
     busy = on;
     working.toggleAttribute("hidden", !on);
@@ -387,8 +414,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (on && atBottom()) toBottom();
   }
 
-  function showPending(cid: string, text: string, sent: boolean): void {
+  function showPending(cid: string, text: string, sent: boolean, image?: Photo): void {
     const el = h("div", { class: "me pending" }, text, h("span", { class: "note" }, sent ? "Sending…" : "Waiting for your computer"));
+    if (image) el.prepend(h("img", { class: "photo", alt: "Your photo", src: `data:${image.mime};base64,${image.b64}` }));
     pending.set(cid, el);
     col.append(el, working);
     toBottom();
@@ -446,7 +474,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const cached = await store.items();
   for (const it of cached) place(it, "end");
   // a pending approval's card stays usable only if no state was recorded for it
-  for (const m of await store.outbox()) showPending(m.cid, m.text, false);
+  for (const m of await store.outbox()) showPending(m.cid, m.text, false, m.image);
   toBottom();
   setStatus(false, false);
   await client.start();
@@ -467,6 +495,30 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     setBusy(busy);
   };
   input.addEventListener("input", grow);
+  function setPhoto(p: Photo | null): void {
+    photo = p;
+    attachment.replaceChildren();
+    attachment.hidden = !p;
+    if (p) {
+      const remove = h("button", { type: "button", "aria-label": "Remove the photo" }, icon(ICONS.close));
+      remove.onclick = () => setPhoto(null);
+      attachment.append(h("img", { alt: "Photo to send", src: `data:${p.mime};base64,${p.b64}` }), remove);
+    }
+    setBusy(busy);
+  }
+  photoBtn.onclick = () => fileInput.click();
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = "";
+    if (!file) return;
+    try {
+      setPhoto(await shrinkPhoto(file));
+      input.focus();
+    } catch {
+      setPhoto(null);
+      alert("That photo couldn't be used. Try another one, or a screenshot of it.");
+    }
+  });
   input.addEventListener("keydown", (e) => {
     // Enter is a new line (SPEC §7.4); the send button or Ctrl/Cmd+Enter sends.
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.isComposing) {
@@ -477,16 +529,18 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    if (!text) {
+    if (!text && !photo) {
       if (stopMode()) await client.send({ t: "stop" });
       return;
     }
+    const image = photo ?? undefined;
     input.value = "";
+    setPhoto(null);
     lastSend = Date.now();
     setTimeout(() => setBusy(busy), STOP_GRACE + 50);
     grow();
-    const cid = await client.say(text);
-    showPending(cid, text, client.computer);
+    const cid = await client.say(text, image);
+    showPending(cid, text, client.computer, image);
   });
 
   let settingsUi: SettingsUi | null = null;

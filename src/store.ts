@@ -11,6 +11,18 @@ const DB_VERSION = 1;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
+/** A message waiting to be sent: its text and, optionally, a photo (SPEC §6.5). Encrypted like the rest. */
+export interface Photo {
+  mime: string;
+  b64: string;
+}
+export interface Queued {
+  cid: string;
+  text: string;
+  ts: number;
+  image?: Photo;
+}
+
 export interface Item {
   seq: number;
   ts: number;
@@ -110,13 +122,13 @@ export class Store {
     await done(tx);
   }
 
-  async outbox(): Promise<{ cid: string; text: string; ts: number }[]> {
+  async outbox(): Promise<Queued[]> {
     const all = (await request(this.db.transaction("outbox").objectStore("outbox").getAll())) as ArrayBuffer[];
-    const out = await Promise.all(all.map((d) => this.open<{ cid: string; text: string; ts: number }>(d)));
-    return (out.filter(Boolean) as { cid: string; text: string; ts: number }[]).sort((a, b) => a.ts - b.ts);
+    const out = await Promise.all(all.map((d) => this.open<Queued>(d)));
+    return (out.filter(Boolean) as Queued[]).sort((a, b) => a.ts - b.ts);
   }
 
-  async queue(entry: { cid: string; text: string; ts: number }): Promise<void> {
+  async queue(entry: Queued): Promise<void> {
     const sealed = await this.seal(entry);
     const tx = this.db.transaction("outbox", "readwrite");
     tx.objectStore("outbox").put(sealed, entry.cid);

@@ -85,6 +85,14 @@ a { color: inherit; text-underline-offset: 3px; }
 .send { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent);
   display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .send.stop { background: var(--ink); color: var(--bg); }
+.attach { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.attachment { max-width: 760px; margin: 0 auto 8px; display: flex; align-items: flex-start; gap: 6px; }
+.attachment img { max-height: 96px; max-width: 160px; border-radius: 10px; border: 1px solid var(--line); }
+.attachment button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.attachment button svg { width: 16px; height: 16px; }
+.me img.photo { display: block; max-width: min(260px, 100%); border-radius: 12px; margin-bottom: 6px; }
 
 .screen { margin: auto; max-width: 480px; padding: 32px 24px; display: flex; flex-direction: column; gap: 16px; text-align: center; }
 .screen h1 { margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -0.5px; }

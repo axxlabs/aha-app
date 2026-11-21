@@ -5,7 +5,7 @@
 // the end-to-end ratchet with the computer, the outbox and sync. The gateway only ever sees ciphertext.
 
 import * as c from "./crypto";
-import type { Item, Store } from "./store";
+import type { Item, Photo, Store } from "./store";
 
 export const APP_VERSION = "0.2.0";
 const enc = new TextEncoder();
@@ -290,7 +290,7 @@ export class Client {
       await this.send({ t: "hello", name: this.identity.deviceName, version: APP_VERSION, ...(await this.pushField()) });
     }
     await this.send({ t: "sync_request", after: this.last, ...(this.last === 0 ? { days: this.settings.keepDays } : {}) });
-    for (const m of await this.store.outbox()) await this.send({ t: "say", text: m.text, cid: m.cid });
+    for (const m of await this.store.outbox()) await this.send({ t: "say", text: m.text, cid: m.cid, ...(m.image ? { image: m.image } : {}) });
   }
 
   private async pushField(): Promise<{ push?: unknown }> {
@@ -365,10 +365,10 @@ export class Client {
     await this.store.put("last", this.last);
   }
 
-  async say(text: string): Promise<string> {
+  async say(text: string, image?: Photo): Promise<string> {
     const cid = c.b64e(c.randomBytes(9)).replace(/[+/=]/g, "x");
-    await this.store.queue({ cid, text, ts: Math.floor(Date.now() / 1000) });
-    if (this.computer) await this.send({ t: "say", text, cid });
+    await this.store.queue({ cid, text, ts: Math.floor(Date.now() / 1000), ...(image ? { image } : {}) });
+    if (this.computer) await this.send({ t: "say", text, cid, ...(image ? { image } : {}) });
     return cid;
   }
 }

@@ -10,7 +10,8 @@
     "build": "tsc --noEmit && vite build && vite build -c vite.sw.config.ts",
     "test": "vitest run",
     "check": "tsc --noEmit",
-    "preview": "vite preview --host 127.0.0.1 --port 4173"
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "dev:lan": "AHA_DEV_LAN=1 vite"
   },
   "dependencies": {
     "@noble/ciphers": "2.4.0",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@types/markdown-it": "14.2.0",
     "@types/node": "26.6.6",
+    "@vitejs/plugin-basic-ssl": "2.3.0",
     "fake-indexeddb": "6.2.8",
     "jsdom": "31.0.1",
     "typescript": "7.0.2",

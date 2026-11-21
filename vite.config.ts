@@ -5,6 +5,7 @@ import basicSsl from "@vitejs/plugin-basic-ssl";
 import { defineConfig, type Plugin } from "vitest/config";
 
 function build(): string {
+  if (process.env.AHA_BUILD) return process.env.AHA_BUILD; // set by deploy/update.sh, which builds without .git
   try {
     return execSync("git rev-parse --short HEAD").toString().trim();
   } catch {

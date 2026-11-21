@@ -1,0 +1,61 @@
+#cloud-config
+# The Aha! app's own server on Hetzner Cloud (SPEC §7.4), separate from the gateway's. Used by create.sh; holds
+# no secrets. Ubuntu 24.04: an admin user with the operator's SSH key, no root or password login, automatic
+# security updates, Docker; the app is built here from the public repo and served by Caddy.
+users:
+  - name: aha
+    groups: [sudo, docker]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys: ["@SSH_KEY@"]
+disable_root: true
+ssh_pwauth: false
+package_update: true
+package_upgrade: true
+packages: [docker.io, docker-compose-v2, git, unattended-upgrades, fail2ban]
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-aha.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+  - path: /etc/docker/daemon.json
+    content: |
+      { "log-driver": "json-file", "log-opts": { "max-size": "10m", "max-file": "3" }, "live-restore": true }
+  - path: /etc/systemd/system/aha-app-update.service
+    content: |
+      [Unit]
+      Description=Build and publish the Aha! app from main (SPEC 7.4)
+      After=docker.service network-online.target
+      Requires=docker.service
+      [Service]
+      Type=oneshot
+      User=aha
+      Group=aha
+      ExecStart=/usr/local/bin/aha-app-update
+  - path: /etc/systemd/system/aha-app-update.timer
+    content: |
+      [Unit]
+      Description=Check aha-app's main branch every 5 minutes
+      [Timer]
+      OnBootSec=1min
+      OnUnitActiveSec=5min
+      [Install]
+      WantedBy=timers.target
+runcmd:
+  - systemctl restart ssh
+  - systemctl enable --now docker fail2ban
+  - install -d -o aha -g aha /opt/aha-app /srv/aha-app /srv/aha-app/releases
+  - sudo -u aha git clone https://github.com/axxlabs/aha-app /opt/aha-app/src
+  # A copy of the script runs, not the checkout it updates (SPEC 7.4). Reinstall it by hand when it changes.
+  - install -m 0755 /opt/aha-app/src/deploy/update.sh /usr/local/bin/aha-app-update
+  - sudo -u aha /usr/local/bin/aha-app-update --force
+  - printf 'AHA_SITES=@SITES@\n' > /opt/aha-app/src/deploy/.env
+  - cd /opt/aha-app/src/deploy && docker compose up -d
+  - systemctl daemon-reload
+  - systemctl enable --now aha-app-update.timer

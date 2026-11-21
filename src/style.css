@@ -138,3 +138,4 @@ select { border: 1px solid var(--line); background: var(--card); border-radius: 
 .warn-box p { margin: 0; color: var(--warn); }
 .warn-box input, .screen input { font: inherit; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; background: var(--card); color: inherit; }
 code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; white-space: nowrap; }
+.screen .primary:disabled, .btn:disabled { opacity: .45; cursor: not-allowed; }

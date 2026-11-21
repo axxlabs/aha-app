@@ -58,6 +58,8 @@ a { color: inherit; text-underline-offset: 3px; }
 .card h3 { margin: 0; font-size: 16px; font-weight: 800; }
 .card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 4px; font-size: 15px; }
 .card dt { color: var(--muted); } .card dd { margin: 0; overflow-wrap: anywhere; }
+.card dd.long { white-space: pre-wrap; max-height: 40vh; overflow-y: auto; }
+.card textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); color: inherit; border-radius: 8px; padding: 6px 8px; font: inherit; resize: vertical; min-height: 8em; }
 .card input { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 5px 8px; }
 .card .actions { display: flex; gap: 8px; }
 .card .actions button { flex: 1; min-height: 42px; border-radius: 999px; border: 1.5px solid var(--line);

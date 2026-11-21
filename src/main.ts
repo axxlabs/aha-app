@@ -250,19 +250,20 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 
   function approvalCard(it: Item): HTMLElement {
     const id = String(it.id);
-    const fields = (it.fields as { label: string; value: string; editable: boolean }[]) ?? [];
+    const fields = (it.fields as { label: string; value: string; editable: boolean; kind?: string }[]) ?? [];
     const buttons = (it.buttons as string[]) ?? ["Approve", "Decline"];
     const dl = h("dl", {});
-    const inputs: (HTMLInputElement | null)[] = [];
+    const inputs: (HTMLInputElement | HTMLTextAreaElement | null)[] = [];
     fields.forEach((f) => {
       dl.append(h("dt", {}, f.label));
-      const dd = h("dd", {}, f.value);
+      const dd = h("dd", f.kind === "longtext" ? { class: "long" } : {}, f.value);
       dl.append(dd);
       inputs.push(null);
     });
     const stateEl = h("div", { class: "state" });
     const actions = h("div", { class: "actions" });
-    const card = h("article", { class: "card" }, h("h3", {}, `${it.kind === "memory" || it.kind === "forget" ? "🧠" : "✋"} ${String(it.title)}`));
+    const icon = it.kind === "memory" || it.kind === "forget" ? "🧠" : it.kind === "email" || it.kind === "draft" ? "✉️" : "✋";
+    const card = h("article", { class: "card" }, h("h3", {}, `${icon} ${String(it.title)}`));
     const img = it.image as { mime?: string; b64?: string } | undefined;
     if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) card.append(h("img", { alt: "Screenshot of the page", src: `data:${img.mime};base64,${img.b64}` }));
     card.append(dl, actions, stateEl);
@@ -288,7 +289,11 @@ async function chat(store: Store, identity: Identity): Promise<void> {
         edit.setAttribute("disabled", "");
         [...dl.querySelectorAll("dd")].forEach((dd, i) => {
           if (!fields[i].editable) return;
-          const inp = h("input", { type: "text", value: fields[i].value, "aria-label": fields[i].label }) as HTMLInputElement;
+          const inp =
+            fields[i].kind === "longtext"
+              ? (h("textarea", { rows: "8", "aria-label": fields[i].label }) as HTMLTextAreaElement)
+              : (h("input", { type: "text", value: fields[i].value, "aria-label": fields[i].label }) as HTMLInputElement);
+          if (inp instanceof HTMLTextAreaElement) inp.value = fields[i].value;
           inputs[i] = inp;
           dd.replaceChildren(inp);
         });
@@ -303,7 +308,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (!c) return;
     c.resolved = true;
     for (const b of c.el.querySelectorAll("button")) b.setAttribute("disabled", "");
-    for (const i of c.el.querySelectorAll("input")) i.setAttribute("disabled", "");
+    for (const i of c.el.querySelectorAll("input, textarea")) i.setAttribute("disabled", "");
     const label: Record<string, string> = { approved: "✓ Approved", declined: "Declined", expired: "Expired", stopped: "Stopped", replaced: "Replaced by an edited version" };
     const el = c.el.querySelector(".state");
     if (el) el.textContent = label[st] ?? st;

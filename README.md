@@ -4,6 +4,10 @@ The **Aha!** app: one private conversation with Aha! Your private agent, which r
 ([aha-local-llm](https://github.com/axxlabs/aha-local-llm)). It's an installable web app (add it to your home
 screen); store versions come later.
 
+**Live at <https://app.aha.axxlabs.ai>**, published by [this repo's workflow](.github/workflows/pages.yml)
+from `main` after the tests pass, and only by it. Each run's summary lists the SHA-256 of every file served, so
+you can check the live app against a build of this source.
+
 - **End-to-end encrypted.** Pairing is a QR code from your computer (`aha pair <name>`): a hybrid post-quantum
   handshake (X25519 + ML-KEM-768) bound to a secret that only the QR code carries, then a Double Ratchet with
   ML-KEM steps: a fresh key for every message. The [gateway](https://github.com/axxlabs/aha-gateway) in the

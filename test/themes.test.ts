@@ -13,6 +13,14 @@ describe("colour themes (SPEC §7.4)", () => {
   it("every theme but the default has a light and a dark palette in the CSS", () => {
     for (const t of THEMES.slice(1)) expect(css.split(`:root[data-theme="${t.id}"]`).length - 1).toBe(2);
   });
+  it("Dark and Light can be forced for every colour, whatever the system says", () => {
+    expect(css).toContain(':root[data-mode="dark"] {');
+    expect(css).toContain(':root:not([data-mode="light"]) {');
+    for (const t of THEMES.slice(1)) {
+      expect(css).toContain(`:root[data-mode="dark"][data-theme="${t.id}"]`);
+      expect(css).toContain(`:root[data-theme="${t.id}"]:not([data-mode="light"])`);
+    }
+  });
   it("unknown ids fall back to the default", () => {
     expect(themeById("nope").id).toBe(DEFAULT_THEME);
   });

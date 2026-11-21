@@ -48,9 +48,10 @@ export interface Settings {
   keepDays: number; // 30, 7, 1 or 0 (don't keep)
   notifications: boolean;
   theme: string; // a colour theme id (themes.ts)
+  appearance: "auto" | "light" | "dark";
 }
 
-export const DEFAULT_SETTINGS: Settings = { keepDays: 30, notifications: false, theme: "saffron-hour" };
+export const DEFAULT_SETTINGS: Settings = { keepDays: 30, notifications: false, theme: "saffron-hour", appearance: "auto" };
 
 export function parsePairLink(hash: string): PairData {
   const m = /^#pair=([A-Za-z0-9_-]+)$/.exec(hash);

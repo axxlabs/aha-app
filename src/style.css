@@ -6,7 +6,7 @@
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #151412; --ink: #F4F1EA; --muted: #A8A399; --card: #211F1C; --line: #37332D; --soft: #1C1A17;
+  :root:not([data-mode="light"]) { --bg: #151412; --ink: #F4F1EA; --muted: #A8A399; --card: #211F1C; --line: #37332D; --soft: #1C1A17;
     --accent-soft: #3A2C17; --warn: #F79009; }
 }
 * { box-sizing: border-box; }
@@ -123,12 +123,21 @@ select { border: 1px solid var(--line); background: var(--card); border-radius: 
 :root[data-theme="fern-hollow"] { --accent: #4F8A3E; --on-accent: #fff; --bg: #F6F8F3; --soft: #EAF0E3; --line: #DCE5D2; --accent-soft: #DDEDD5; }
 :root[data-theme="midnight-ink"] { --accent: #3563C9; --on-accent: #fff; --bg: #F5F7FB; --soft: #E8EDF6; --line: #D9E0EE; --accent-soft: #DCE6FA; }
 @media (prefers-color-scheme: dark) {
-  :root[data-theme="sea-glass"] { --accent: #38B2A3; --on-accent: #111; --bg: #111615; --soft: #161D1C; --card: #1B2322; --line: #2C3836; --accent-soft: #16302C; }
-  :root[data-theme="lavender-haze"] { --accent: #9584EC; --on-accent: #111; --bg: #141218; --soft: #1A1720; --card: #201C27; --line: #35303F; --accent-soft: #2A2442; }
-  :root[data-theme="terracotta-sun"] { --accent: #E07A4C; --on-accent: #111; --bg: #171211; --soft: #1E1715; --card: #251C19; --line: #3A2D28; --accent-soft: #3D2218; }
-  :root[data-theme="fern-hollow"] { --accent: #6BAA57; --on-accent: #111; --bg: #121510; --soft: #181C15; --card: #1E231A; --line: #303829; --accent-soft: #1F3019; }
-  :root[data-theme="midnight-ink"] { --accent: #5B8BEA; --on-accent: #111; --bg: #101318; --soft: #151A21; --card: #1B212A; --line: #2C3442; --accent-soft: #18264A; }
+  :root[data-theme="sea-glass"]:not([data-mode="light"]) { --accent: #38B2A3; --on-accent: #111; --bg: #111615; --soft: #161D1C; --card: #1B2322; --line: #2C3836; --accent-soft: #16302C; }
+  :root[data-theme="lavender-haze"]:not([data-mode="light"]) { --accent: #9584EC; --on-accent: #111; --bg: #141218; --soft: #1A1720; --card: #201C27; --line: #35303F; --accent-soft: #2A2442; }
+  :root[data-theme="terracotta-sun"]:not([data-mode="light"]) { --accent: #E07A4C; --on-accent: #111; --bg: #171211; --soft: #1E1715; --card: #251C19; --line: #3A2D28; --accent-soft: #3D2218; }
+  :root[data-theme="fern-hollow"]:not([data-mode="light"]) { --accent: #6BAA57; --on-accent: #111; --bg: #121510; --soft: #181C15; --card: #1E231A; --line: #303829; --accent-soft: #1F3019; }
+  :root[data-theme="midnight-ink"]:not([data-mode="light"]) { --accent: #5B8BEA; --on-accent: #111; --bg: #101318; --soft: #151A21; --card: #1B212A; --line: #2C3442; --accent-soft: #18264A; }
 }
+/* Appearance (SPEC §7.4): Light forces the light palette; Dark forces the dark one whatever the system says. */
+:root[data-mode="light"] { color-scheme: light; }
+:root[data-mode="dark"] { --bg: #151412; --ink: #F4F1EA; --muted: #A8A399; --card: #211F1C; --line: #37332D; --soft: #1C1A17;
+    --accent-soft: #3A2C17; --warn: #F79009; color-scheme: dark; }
+:root[data-mode="dark"][data-theme="sea-glass"] { --accent: #38B2A3; --on-accent: #111; --bg: #111615; --soft: #161D1C; --card: #1B2322; --line: #2C3836; --accent-soft: #16302C; }
+:root[data-mode="dark"][data-theme="lavender-haze"] { --accent: #9584EC; --on-accent: #111; --bg: #141218; --soft: #1A1720; --card: #201C27; --line: #35303F; --accent-soft: #2A2442; }
+:root[data-mode="dark"][data-theme="terracotta-sun"] { --accent: #E07A4C; --on-accent: #111; --bg: #171211; --soft: #1E1715; --card: #251C19; --line: #3A2D28; --accent-soft: #3D2218; }
+:root[data-mode="dark"][data-theme="fern-hollow"] { --accent: #6BAA57; --on-accent: #111; --bg: #121510; --soft: #181C15; --card: #1E231A; --line: #303829; --accent-soft: #1F3019; }
+:root[data-mode="dark"][data-theme="midnight-ink"] { --accent: #5B8BEA; --on-accent: #111; --bg: #101318; --soft: #151A21; --card: #1B212A; --line: #2C3442; --accent-soft: #18264A; }
 .swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .swatch { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); text-align: left; font-size: 14px; font-weight: 600; line-height: 1.2; }
 .swatch i { flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.08); }
@@ -139,3 +148,6 @@ select { border: 1px solid var(--line); background: var(--card); border-radius: 
 .warn-box input, .screen input { font: inherit; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; background: var(--card); color: inherit; }
 code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; white-space: nowrap; }
 .screen .primary:disabled, .btn:disabled { opacity: .45; cursor: not-allowed; }
+.segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--soft); }
+.segmented button { border: 0; border-radius: 10px; padding: 8px 10px; background: transparent; font-size: 14px; font-weight: 600; }
+.segmented button[aria-checked="true"] { background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.12); }

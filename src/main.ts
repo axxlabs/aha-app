@@ -4,7 +4,7 @@
 // The Aha! app (SPEC §7.4): one GPT-style conversation with your own computer, end-to-end encrypted.
 
 import "./style.css";
-import { THEMES, applyTheme } from "./themes";
+import { APPEARANCES, THEMES, applyTheme } from "./themes";
 import { APP_VERSION, Client, shortFingerprint, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { Ratchet, type RatchetState, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
@@ -64,7 +64,8 @@ async function boot(): Promise<void> {
     return;
   }
   const store = await Store.open();
-  applyTheme((await store.get<Settings>("settings"))?.theme);
+  const saved = await store.get<Settings>("settings");
+  applyTheme(saved?.theme, saved?.appearance);
   if (location.hash.startsWith("#pair=")) return pairingScreen(store);
   const identity = await store.get<Identity>("identity");
   if (!identity) return welcomeScreen();
@@ -535,6 +536,17 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   const clearBtn = h("button", { class: "btn", type: "button" }, "Clear");
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
   const reportBtn = h("button", { class: "btn", type: "button" }, "Report");
+  const modes = h("div", { class: "segmented", role: "radiogroup", "aria-label": "Appearance" });
+  for (const m of APPEARANCES) {
+    const b = h("button", { type: "button", role: "radio", "aria-checked": String(m.id === (client.settings.appearance ?? "auto")) }, m.name);
+    b.onclick = async () => {
+      for (const o of modes.children) o.setAttribute("aria-checked", String(o === b));
+      applyTheme(client.settings.theme, m.id);
+      client.settings = { ...client.settings, appearance: m.id };
+      await store.put("settings", client.settings);
+    };
+    modes.append(b);
+  }
   const swatches = h("div", { class: "swatches", role: "radiogroup", "aria-label": "Colour" });
   for (const t of THEMES) {
     const dot = h("i");
@@ -542,7 +554,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     const b = h("button", { class: "swatch", type: "button", role: "radio", "aria-checked": String(t.id === client.settings.theme) }, dot, t.name);
     b.onclick = async () => {
       for (const o of swatches.children) o.setAttribute("aria-checked", String(o === b));
-      applyTheme(t.id);
+      applyTheme(t.id, client.settings.appearance);
       client.settings = { ...client.settings, theme: t.id };
       await store.put("settings", client.settings);
     };
@@ -567,6 +579,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         h("div", { class: "row" }, h("span", {}, "Clear this device's cache"), clearBtn),
         h("div", { class: "row" }, h("span", {}, "Unpair this device", h("small", {}, "Deletes its keys and cached messages.")), unpair),
       ),
+      h("section", {}, h("h4", {}, "Appearance"), modes),
       h("section", {}, h("h4", {}, "Colour"), swatches),
       h("section", {}, h("h4", {}, "Help"), h("div", { class: "row" }, h("span", {}, "Report a problem", h("small", {}, "You choose what's shared, and see it before it's sent.")), reportBtn)),
       h(

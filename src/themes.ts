@@ -26,12 +26,23 @@ export function themeById(id: string | undefined): Theme {
   return THEMES.find((t) => t.id === id) ?? THEMES[0];
 }
 
-/** Apply a theme to the page: the CSS palette by attribute, and the browser's own bar colour. */
-export function applyTheme(id: string | undefined): void {
+export type Appearance = "auto" | "light" | "dark";
+export const APPEARANCES: { id: Appearance; name: string }[] = [
+  { id: "auto", name: "Auto" },
+  { id: "light", name: "Light" },
+  { id: "dark", name: "Dark" },
+];
+
+/** Apply a colour and an appearance: the CSS palette by attributes, and the browser's own bar colour. */
+export function applyTheme(id: string | undefined, mode: Appearance | undefined = "auto"): void {
   const theme = themeById(id);
-  if (theme.id === DEFAULT_THEME) delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = theme.id;
+  const root = document.documentElement;
+  if (theme.id === DEFAULT_THEME) delete root.dataset.theme;
+  else root.dataset.theme = theme.id;
+  if (mode === "light" || mode === "dark") root.dataset.mode = mode;
+  else delete root.dataset.mode;
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
-    meta.content = meta.media.includes("dark") ? theme.dark : theme.light;
+    const dark = mode === "dark" || (mode !== "light" && meta.media.includes("dark"));
+    meta.content = dark ? theme.dark : theme.light;
   }
 }

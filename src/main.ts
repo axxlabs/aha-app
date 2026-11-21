@@ -262,12 +262,43 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     });
     const stateEl = h("div", { class: "state" });
     const actions = h("div", { class: "actions" });
-    const icon = it.kind === "memory" || it.kind === "forget" ? "🧠" : it.kind === "email" || it.kind === "draft" ? "✉️" : "✋";
+    const icon =
+      it.kind === "memory" || it.kind === "forget" ? "🧠" : it.kind === "email" || it.kind === "draft" ? "✉️" : it.kind === "signin" ? "🔑" : "✋";
     const card = h("article", { class: "card" }, h("h3", {}, `${icon} ${String(it.title)}`));
     const img = it.image as { mime?: string; b64?: string } | undefined;
     if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) card.append(h("img", { alt: "Screenshot of the page", src: `data:${img.mime};base64,${img.b64}` }));
     card.append(dl, actions, stateEl);
     let editing = false;
+    // A sign-in card's inputs are open from the start: the person types into them (SPEC §5.3).
+    const openInputs = it.kind === "signin";
+    const inputFor = (f: (typeof fields)[number]): HTMLInputElement | HTMLTextAreaElement => {
+      if (f.kind === "longtext") {
+        const ta = h("textarea", { rows: "8", "aria-label": f.label }) as HTMLTextAreaElement;
+        ta.value = f.value;
+        return ta;
+      }
+      if (f.kind === "bool") {
+        const box = h("input", { type: "checkbox", "aria-label": f.label }) as HTMLInputElement;
+        box.checked = f.value === "true";
+        return box;
+      }
+      if (f.kind === "secret") {
+        // Never pre-filled, never stored: cleared as soon as it's sent. Codes get the phone's one-time-code fill.
+        const code = /code|otp|pin|verif/i.test(f.label);
+        return h("input", {
+          type: code ? "text" : "password",
+          autocomplete: code ? "one-time-code" : "off",
+          ...(code ? { inputmode: "numeric" } : {}),
+          "aria-label": f.label,
+        }) as HTMLInputElement;
+      }
+      return h("input", { type: "text", value: f.value, "aria-label": f.label, ...(openInputs ? { autocomplete: "username" } : {}) }) as HTMLInputElement;
+    };
+    const valueOf = (f: (typeof fields)[number], i: number): string => {
+      const inp = inputs[i];
+      if (!inp) return f.value;
+      return inp instanceof HTMLInputElement && inp.type === "checkbox" ? String(inp.checked) : inp.value;
+    };
     const approve = h("button", { class: "primary", type: "button" }, buttons[0] ?? "Approve");
     const edit = buttons.length === 3 ? h("button", { type: "button" }, buttons[1]) : null;
     const decline = h("button", { type: "button" }, buttons[buttons.length - 1] ?? "Decline");
@@ -277,8 +308,13 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       stateEl.textContent = text;
     };
     approve.onclick = async () => {
-      const values = fields.map((f, i) => inputs[i]?.value ?? f.value);
-      if (await client.send({ t: "approval_reply", id, decision: "approve", ...(editing ? { values } : {}) })) disable("Sending…");
+      const values = fields.map(valueOf);
+      const sent = await client.send({ t: "approval_reply", id, decision: "approve", ...(editing ? { values } : {}) });
+      fields.forEach((f, i) => {
+        const inp = inputs[i];
+        if (f.kind === "secret" && inp) inp.value = "";
+      });
+      if (sent) disable("Sending…");
     };
     decline.onclick = async () => {
       if (await client.send({ t: "approval_reply", id, decision: "decline" })) disable("Sending…");
@@ -289,16 +325,28 @@ async function chat(store: Store, identity: Identity): Promise<void> {
         edit.setAttribute("disabled", "");
         [...dl.querySelectorAll("dd")].forEach((dd, i) => {
           if (!fields[i].editable) return;
-          const inp =
-            fields[i].kind === "longtext"
-              ? (h("textarea", { rows: "8", "aria-label": fields[i].label }) as HTMLTextAreaElement)
-              : (h("input", { type: "text", value: fields[i].value, "aria-label": fields[i].label }) as HTMLInputElement);
-          if (inp instanceof HTMLTextAreaElement) inp.value = fields[i].value;
+          const inp = inputFor(fields[i]);
           inputs[i] = inp;
           dd.replaceChildren(inp);
         });
         inputs.find(Boolean)?.focus();
       };
+    if (openInputs) {
+      editing = true;
+      [...dl.querySelectorAll("dd")].forEach((dd, i) => {
+        if (!fields[i].editable && fields[i].kind !== "bool") return;
+        const inp = inputFor(fields[i]);
+        if (inp instanceof HTMLInputElement && inp.type !== "checkbox")
+          inp.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.isComposing) {
+              e.preventDefault();
+              approve.click();
+            }
+          });
+        inputs[i] = inp;
+        dd.replaceChildren(inp);
+      });
+    }
     cards.set(id, { el: card, resolved: false });
     return card;
   }
@@ -308,7 +356,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (!c) return;
     c.resolved = true;
     for (const b of c.el.querySelectorAll("button")) b.setAttribute("disabled", "");
-    for (const i of c.el.querySelectorAll("input, textarea")) i.setAttribute("disabled", "");
+    for (const i of c.el.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")) {
+      i.setAttribute("disabled", "");
+      if (i.type === "password" || i.autocomplete === "one-time-code") i.value = "";
+    }
     const label: Record<string, string> = { approved: "✓ Approved", declined: "Declined", expired: "Expired", stopped: "Stopped", replaced: "Replaced by an edited version" };
     const el = c.el.querySelector(".state");
     if (el) el.textContent = label[st] ?? st;
@@ -321,12 +372,18 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     banner.textContent = "Your Aha! computer is offline. What you write waits here and is sent when it's back.";
   }
 
+  // The send button turns into Stop while Aha! works, but only from 1.5 s after the last send, so a double tap
+  // or a second tap on Send never cancels the message just sent (SPEC §7.4).
+  const STOP_GRACE = 1500;
+  let lastSend = 0;
+  const stopMode = () => busy && !input.value.trim() && Date.now() - lastSend >= STOP_GRACE;
   function setBusy(on: boolean): void {
     busy = on;
     working.toggleAttribute("hidden", !on);
-    sendBtn.classList.toggle("stop", on && !input.value.trim());
-    sendBtn.replaceChildren(icon(on && !input.value.trim() ? ICONS.stop : ICONS.send));
-    sendBtn.setAttribute("aria-label", on && !input.value.trim() ? "Stop" : "Send");
+    const stop = stopMode();
+    sendBtn.classList.toggle("stop", stop);
+    sendBtn.replaceChildren(icon(stop ? ICONS.stop : ICONS.send));
+    sendBtn.setAttribute("aria-label", stop ? "Stop" : "Send");
     if (on && atBottom()) toBottom();
   }
 
@@ -421,10 +478,12 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) {
-      if (busy) await client.send({ t: "stop" });
+      if (stopMode()) await client.send({ t: "stop" });
       return;
     }
     input.value = "";
+    lastSend = Date.now();
+    setTimeout(() => setBusy(busy), STOP_GRACE + 50);
     grow();
     const cid = await client.say(text);
     showPending(cid, text, client.computer);

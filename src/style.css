@@ -61,6 +61,7 @@ a { color: inherit; text-underline-offset: 3px; }
 .card dd.long { white-space: pre-wrap; max-height: 40vh; overflow-y: auto; }
 .card textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); color: inherit; border-radius: 8px; padding: 6px 8px; font: inherit; resize: vertical; min-height: 8em; }
 .card input { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 5px 8px; }
+.card input[type="checkbox"] { width: 22px; height: 22px; padding: 0; accent-color: var(--accent, currentColor); }
 .card .actions { display: flex; gap: 8px; }
 .card .actions button { flex: 1; min-height: 42px; border-radius: 999px; border: 1.5px solid var(--line);
   background: transparent; font-weight: 700; }

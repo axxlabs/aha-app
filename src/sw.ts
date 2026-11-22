@@ -57,7 +57,7 @@ self.addEventListener("push", (e) => {
         data = null;
       }
       const preview = data ? await previewFrom(data) : null;
-      await self.registration.showNotification("Aha!", { body: preview ?? FIXED, icon: "/icon.svg", tag: "aha", renotify: true } as NotificationOptions);
+      await self.registration.showNotification("Aha!", { body: preview ?? FIXED, icon: "/icon-192.png", tag: "aha", renotify: true } as NotificationOptions);
     })(),
   );
 });

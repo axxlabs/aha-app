@@ -5,7 +5,8 @@
 
 import "./style.css";
 import { APPEARANCES, THEMES, applyTheme } from "./themes";
-import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
+import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type Identity, type Settings, pair, parsePairLink } from "./client";
+import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
 import { type Item, type Photo, Store } from "./store";
@@ -296,22 +297,65 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const dl = h("dl", {});
     const inputs: (HTMLInputElement | HTMLTextAreaElement | null)[] = [];
     fields.forEach((f) => {
-      dl.append(h("dt", {}, f.label));
-      const dd = h("dd", f.kind === "longtext" ? { class: "long" } : {}, f.value);
+      const hidden: Record<string, string> = f.kind === "taps" ? { hidden: "" } : {}; // a check card's taps are made on the screenshot
+      dl.append(h("dt", hidden, f.label));
+      const dd = h("dd", f.kind === "longtext" ? { class: "long", ...hidden } : hidden, f.value);
       dl.append(dd);
       inputs.push(null);
     });
     const stateEl = h("div", { class: "state" });
     const actions = h("div", { class: "actions" });
     const icon =
-      it.kind === "memory" || it.kind === "forget" ? "🧠" : it.kind === "email" || it.kind === "draft" ? "✉️" : it.kind === "signin" ? "🔑" : it.kind === "schedule" ? "⏰" : "✋";
+      it.kind === "memory" || it.kind === "forget"
+        ? "🧠"
+        : it.kind === "email" || it.kind === "draft"
+          ? "✉️"
+          : it.kind === "signin"
+            ? "🔑"
+            : it.kind === "schedule"
+              ? "⏰"
+              : it.kind === "check"
+                ? "🧩"
+                : "✋";
     const card = h("article", { class: "card" }, h("h3", {}, `${icon} ${String(it.title)}`));
     const img = it.image as { mime?: string; b64?: string } | undefined;
-    if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) card.append(h("img", { alt: "Screenshot of the page", src: `data:${img.mime};base64,${img.b64}` }));
+    const shot = img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "") ? (h("img", { alt: "Screenshot of the page", src: `data:${img.mime};base64,${img.b64}` }) as HTMLImageElement) : null;
+    // A check card (SPEC §3.4, §5.3): the person taps the screenshot where they'd click.
+    const tapsAt = it.kind === "check" ? fields.findIndex((f) => f.kind === "taps") : -1;
+    const taps: Tap[] = [];
+    let showTaps = () => {};
+    if (shot && tapsAt >= 0) {
+      const frame = h("div", { class: "tap-frame" }, shot);
+      const undo = h("button", { class: "btn", type: "button", disabled: "" }, "Undo last tap");
+      showTaps = () => {
+        for (const d of frame.querySelectorAll(".tap")) d.remove();
+        taps.forEach((t, i) => {
+          const dot = h("span", { class: "tap" }, String(i + 1));
+          dot.style.left = `${(t.x / shot.naturalWidth) * 100}%`; // CSSOM, which the CSP allows
+          dot.style.top = `${(t.y / shot.naturalHeight) * 100}%`;
+          frame.append(dot);
+        });
+        undo.toggleAttribute("disabled", taps.length === 0);
+        approve.textContent = checkButton(taps);
+      };
+      shot.addEventListener("click", (e) => {
+        if (approve.hasAttribute("disabled") || taps.length >= MAX_TAPS) return;
+        const tap = tapOnImage(e.clientX, e.clientY, shot.getBoundingClientRect(), { width: shot.naturalWidth, height: shot.naturalHeight });
+        if (!tap) return;
+        taps.push(tap);
+        showTaps();
+      });
+      undo.onclick = () => {
+        taps.pop();
+        showTaps();
+      };
+      card.append(frame, h("p", { class: "fine" }, "Tap the picture where you'd click, then send your taps. When the check is done, tap “It's done”."), undo);
+    } else if (shot) card.append(shot);
     card.append(dl, actions, stateEl);
     let editing = false;
-    // A sign-in card's inputs are open from the start: the person types into them (SPEC §5.3).
-    const openInputs = it.kind === "signin";
+    // A sign-in card's inputs are open from the start: the person types into them (SPEC §5.3). A check card's
+    // only input is the screenshot.
+    const openInputs = it.kind === "signin" || it.kind === "check";
     const inputFor = (f: (typeof fields)[number]): HTMLInputElement | HTMLTextAreaElement => {
       if (f.kind === "longtext") {
         const ta = h("textarea", { rows: "8", "aria-label": f.label }) as HTMLTextAreaElement;
@@ -336,6 +380,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       return h("input", { type: "text", value: f.value, "aria-label": f.label, ...(openInputs ? { autocomplete: "username" } : {}) }) as HTMLInputElement;
     };
     const valueOf = (f: (typeof fields)[number], i: number): string => {
+      if (i === tapsAt) return tapsValue(taps);
       const inp = inputs[i];
       if (!inp) return f.value;
       return inp instanceof HTMLInputElement && inp.type === "checkbox" ? String(inp.checked) : inp.value;
@@ -344,6 +389,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const edit = buttons.length === 3 ? h("button", { type: "button" }, buttons[1]) : null;
     const decline = h("button", { type: "button" }, buttons[buttons.length - 1] ?? "Decline");
     actions.append(approve, ...(edit ? [edit] : []), decline);
+    showTaps();
     const disable = (text: string) => {
       for (const b of actions.querySelectorAll("button")) b.setAttribute("disabled", "");
       stateEl.textContent = text;
@@ -375,6 +421,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (openInputs) {
       editing = true;
       [...dl.querySelectorAll("dd")].forEach((dd, i) => {
+        if (i === tapsAt) return;
         if (!fields[i].editable && fields[i].kind !== "bool") return;
         const inp = inputFor(fields[i]);
         if (inp instanceof HTMLInputElement && inp.type !== "checkbox")
@@ -472,6 +519,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     },
     devices(list) {
       settingsUi?.showDevices(list);
+    },
+    browser(list) {
+      settingsUi?.showBrowser(list);
     },
     report(msg) {
       settingsUi?.onReport(msg);
@@ -581,6 +631,7 @@ interface SettingsUi {
   showHistory(days: number | null): void;
   showMemories(list: { id: string; text: string }[]): void;
   showDevices(list: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
+  showBrowser(list: BrowserSite[]): void;
   onReport(msg: { t: string; id: string; text?: string; ok?: boolean; code?: string }): void;
 }
 
@@ -665,6 +716,9 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
   const memories = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
   const devices = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
+  // Your browser (SPEC §3.4, §7.4): what Aha!'s browser on the computer remembers for this person.
+  const sites = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
+  const clearBrowser = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear");
   // Your history (SPEC §3.8.1): kept on the computer for as long as the person chooses; this device keeps 5 days.
   const keep = h("select", { "aria-label": "Keep my history", disabled: "" }) as HTMLSelectElement;
   for (const [days, label] of HISTORY_CHOICES) keep.append(h("option", { value: days === null ? "forever" : String(days) }, label));
@@ -724,6 +778,14 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         h("div", { class: "row" }, h("span", {}, "Clear history", h("small", {}, "From your computer and all your devices. Memories, reminders and sign-ins stay.")), clearHistory),
         historyNote,
       ),
+      h(
+        "section",
+        {},
+        h("h4", {}, "Your browser"),
+        h("p", { class: "fine" }, "Aha!'s browser remembers sites like your own browser does, so you stay signed in."),
+        sites,
+        h("div", { class: "row" }, h("span", {}, "Clear browser data", h("small", {}, "Signs you out of every site.")), clearBrowser),
+      ),
       h("section", {}, h("h4", {}, "Your devices"), devices),
       h(
         "section",
@@ -761,6 +823,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   void client.send({ t: "memories_request" });
   void client.send({ t: "history_settings_request" });
   void client.send({ t: "devices_request" });
+  void client.send({ t: "browser_request" });
 
   keep.onchange = async () => {
     const days = keep.value === "forever" ? null : Number(keep.value);
@@ -784,6 +847,14 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     else {
       note("Your computer is offline: try again when it's back.");
       clearHistory.disabled = false;
+    }
+  };
+  clearBrowser.onclick = async () => {
+    if (!confirm("Clear everything Aha!'s browser remembers? You'll be signed out of every site.")) return;
+    clearBrowser.disabled = true;
+    if (!(await client.send({ t: "browser_clear" }))) {
+      clearBrowser.disabled = false;
+      alert("Your computer is offline: try again when it's back.");
     }
   };
   notify.onclick = async () => {
@@ -834,6 +905,23 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     showMemories(list) {
       memories.replaceChildren(
         ...(list.length ? list.map((m) => h("div", { class: "row" }, h("span", {}, m.text))) : [h("p", { class: "fine" }, "Nothing yet.")]),
+      );
+    },
+    showBrowser(list) {
+      clearBrowser.disabled = list.length === 0;
+      clearBrowser.textContent = "Clear";
+      sites.replaceChildren(
+        ...(list.length
+          ? list.map((s) => {
+              const forget = h("button", { class: "btn", type: "button" }, "Forget");
+              forget.onclick = async () => {
+                if (!confirm(`Forget ${s.site}? You'll be signed out there.`)) return;
+                forget.setAttribute("disabled", "");
+                if (!(await client.send({ t: "browser_forget", site: s.site }))) forget.removeAttribute("disabled");
+              };
+              return h("div", { class: "row" }, h("span", {}, s.site, ...(s.signed_in ? [h("small", {}, "signed in")] : [])), forget);
+            })
+          : [h("p", { class: "fine" }, "Nothing yet.")]),
       );
     },
     showDevices(list) {

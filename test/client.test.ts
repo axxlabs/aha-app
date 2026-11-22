@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, HISTORY_CHOICES, cacheDays, gatewayProved, parsePairLink, shortFingerprint } from "../src/client";
+import { DEFAULT_SETTINGS, HISTORY_CHOICES, browserSites, cacheDays, gatewayProved, parsePairLink, shortFingerprint } from "../src/client";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import * as c from "../src/crypto";
 
@@ -19,6 +19,16 @@ describe("pairing links (SPEC §6.4)", () => {
   it("short fingerprints match the computer's (`aha status`)", () => {
     const fp = b64url(Uint8Array.from({ length: 32 }, (_, i) => i));
     expect(shortFingerprint(fp)).toBe("AAAQ EAYE AUDA OCAJ"); // same value as the Python test
+  });
+});
+
+describe("Settings → Your browser (SPEC §3.4, §7.4)", () => {
+  it("shows only well-formed sites from the computer", () => {
+    expect(browserSites([{ site: "waitrose.com", signed_in: true }, { site: "news.example", signed_in: "yes" }, { site: 5 }, null, "x"])).toEqual([
+      { site: "waitrose.com", signed_in: true },
+      { site: "news.example", signed_in: false },
+    ]);
+    expect(browserSites(undefined)).toEqual([]);
   });
 });
 

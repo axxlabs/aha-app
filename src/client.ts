@@ -190,6 +190,20 @@ export function pair(data: PairData, deviceName = defaultDeviceName()): Promise<
   });
 }
 
+/** A site the person's browser on the computer remembers (SPEC §3.4, Settings → Your browser). */
+export interface BrowserSite {
+  site: string;
+  signed_in: boolean;
+}
+
+/** The computer's `browser` list, keeping only well-formed entries. */
+export function browserSites(raw: unknown): BrowserSite[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s): s is BrowserSite => !!s && typeof s.site === "string" && s.site.length <= 255)
+    .map((s) => ({ site: s.site, signed_in: s.signed_in === true }));
+}
+
 export interface Events {
   item(it: Item, live: boolean): void;
   typing(on: boolean): void;
@@ -199,6 +213,7 @@ export interface Events {
   historySettings(days: number | null): void;
   memories(items: { id: string; text: string }[]): void;
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
+  browser(sites: BrowserSite[]): void;
   error(code: string): void;
   revoked(): void;
   report(msg: { t: "report_draft" | "report_sent"; id: string; text?: string; ok?: boolean; code?: string }): void;
@@ -365,6 +380,9 @@ export class Client {
         break;
       case "devices":
         this.on.devices(msg.items ?? []);
+        break;
+      case "browser":
+        this.on.browser(browserSites(msg.sites));
         break;
       case "cert":
         if (msg.cert && certValid(msg.cert, this.identity.pin) && msg.cert.device === this.dev) {

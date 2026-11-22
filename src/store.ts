@@ -122,6 +122,13 @@ export class Store {
     await done(tx);
   }
 
+  /** Delete cached items numbered before `start`, whatever they are (SPEC §3.8.1). */
+  async dropBefore(start: number): Promise<void> {
+    const tx = this.db.transaction("items", "readwrite");
+    tx.objectStore("items").delete(IDBKeyRange.upperBound(start, true));
+    await done(tx);
+  }
+
   async outbox(): Promise<Queued[]> {
     const all = (await request(this.db.transaction("outbox").objectStore("outbox").getAll())) as ArrayBuffer[];
     const out = await Promise.all(all.map((d) => this.open<Queued>(d)));

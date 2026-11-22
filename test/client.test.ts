@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 import { describe, expect, it } from "vitest";
-import { gatewayProved, parsePairLink, shortFingerprint } from "../src/client";
+import { DEFAULT_SETTINGS, HISTORY_CHOICES, cacheDays, gatewayProved, parsePairLink, shortFingerprint } from "../src/client";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import * as c from "../src/crypto";
 
@@ -33,5 +33,17 @@ describe("the gateway's proof (SPEC §6.3)", () => {
     expect(gatewayProved(pin, nonce, undefined)).toBe(false);
     const other = c.b64e(ed25519.getPublicKey(c.randomBytes(32)));
     expect(gatewayProved(other, nonce, sig)).toBe(false);
+  });
+});
+
+describe("history (SPEC §3.8.1, §7.5)", () => {
+  it("keeps 5 days on the device, or 1 when the person keeps a day", () => {
+    expect(cacheDays({ ...DEFAULT_SETTINGS })).toBe(5);
+    expect(cacheDays({ ...DEFAULT_SETTINGS, historyDays: null })).toBe(5);
+    expect(cacheDays({ ...DEFAULT_SETTINGS, historyDays: 7 })).toBe(5);
+    expect(cacheDays({ ...DEFAULT_SETTINGS, historyDays: 1 })).toBe(1);
+  });
+  it("offers exactly the lengths the computer accepts", () => {
+    expect(HISTORY_CHOICES.map(([d]) => d)).toEqual([null, 365, 90, 30, 7, 1]);
   });
 });

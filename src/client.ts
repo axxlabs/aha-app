@@ -45,13 +45,27 @@ export interface Identity {
 }
 
 export interface Settings {
-  keepDays: number; // 30, 7, 1 or 0 (don't keep)
+  historyDays?: number | null; // how long the computer keeps this person's history (null: forever), as it last said (SPEC §3.8.1)
   notifications: boolean;
   theme: string; // a colour theme id (themes.ts)
   appearance: "auto" | "light" | "dark";
 }
 
-export const DEFAULT_SETTINGS: Settings = { keepDays: 30, notifications: false, theme: "saffron-hour", appearance: "auto" };
+export const DEFAULT_SETTINGS: Settings = { notifications: false, theme: "saffron-hour", appearance: "auto" };
+
+/** Days of messages kept on the device: 5, or 1 when the person keeps only a day of history (SPEC §7.5). */
+export function cacheDays(settings: Settings): number {
+  return settings.historyDays === 1 ? 1 : 5;
+}
+
+export const HISTORY_CHOICES: [number | null, string][] = [
+  [null, "Forever"],
+  [365, "1 year"],
+  [90, "3 months"],
+  [30, "1 month"],
+  [7, "1 week"],
+  [1, "1 day"],
+];
 
 export function parsePairLink(hash: string): PairData {
   const m = /^#pair=([A-Za-z0-9_-]+)$/.exec(hash);
@@ -181,6 +195,8 @@ export interface Events {
   typing(on: boolean): void;
   status(s: { connected: boolean; computer: boolean }): void;
   history(items: Item[]): void;
+  historyStart(start: number): void; // items before `start` were deleted on the computer
+  historySettings(days: number | null): void;
   memories(items: { id: string; text: string }[]): void;
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   error(code: string): void;
@@ -289,7 +305,7 @@ export class Client {
       this.helloSent = true;
       await this.send({ t: "hello", name: this.identity.deviceName, version: APP_VERSION, ...(await this.pushField()) });
     }
-    await this.send({ t: "sync_request", after: this.last, ...(this.last === 0 ? { days: this.settings.keepDays } : {}) });
+    await this.send({ t: "sync_request", after: this.last, ...(this.last === 0 ? { days: cacheDays(this.settings) } : {}) });
     for (const m of await this.store.outbox()) await this.send({ t: "say", text: m.text, cid: m.cid, ...(m.image ? { image: m.image } : {}) });
   }
 
@@ -327,8 +343,20 @@ export class Client {
         this.on.typing(!!msg.on);
         break;
       case "sync":
+        if (typeof msg.start === "number") await this.dropBefore(msg.start);
         await this.accept((msg.items ?? []) as Item[], false);
         break;
+      case "history_start":
+        if (typeof msg.start === "number") await this.dropBefore(msg.start);
+        break;
+      case "history_settings": {
+        const days = typeof msg.days === "number" ? msg.days : null;
+        this.settings = { ...this.settings, historyDays: days };
+        await this.store.put("settings", this.settings);
+        await this.store.prune(Math.floor(Date.now() / 1000) - cacheDays(this.settings) * 86400, (it) => it.t === "approval");
+        this.on.historySettings(days);
+        break;
+      }
       case "history":
         this.on.history((msg.items ?? []) as Item[]);
         break;
@@ -354,9 +382,15 @@ export class Client {
     }
   }
 
+  /** History before `start` is gone from the computer (its length, or Clear history): delete it here too. */
+  private async dropBefore(start: number): Promise<void> {
+    await this.store.dropBefore(start);
+    this.on.historyStart(start);
+  }
+
   private async accept(items: Item[], live: boolean): Promise<void> {
     const fresh = items.filter((it) => typeof it.seq === "number" && it.seq > 0);
-    if (this.settings.keepDays > 0) await this.store.putItems(fresh);
+    await this.store.putItems(fresh);
     for (const it of fresh) {
       if (it.t === "msg" && it.role === "me" && typeof it.cid === "string") await this.store.unqueue(it.cid);
       if (it.seq > this.last) this.last = it.seq;

@@ -5,7 +5,7 @@
 
 import "./style.css";
 import { APPEARANCES, THEMES, applyTheme } from "./themes";
-import { APP_VERSION, Client, shortFingerprint, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
+import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
 import { type Item, type Photo, Store } from "./store";
@@ -221,6 +221,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   let busy = false;
   let lastDay = "";
   let oldest = Infinity;
+  let historyStart = 1; // the first message the computer still holds (SPEC §3.8.1)
 
   const atBottom = () => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
   const toBottom = () => (scroller.scrollTop = scroller.scrollHeight);
@@ -273,6 +274,19 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (after) col.insertBefore(el, after);
     else col.append(el);
     col.append(working);
+  }
+
+  /** History before `start` was deleted: redraw the chat without it. */
+  function dropBefore(start: number): void {
+    historyStart = Math.max(historyStart, start);
+    const keep = [...items.values()].filter((it) => it.seq >= start).sort((a, b) => a.seq - b.seq);
+    if (keep.length === items.size) return;
+    items.clear();
+    cards.clear();
+    lastDay = "";
+    oldest = Infinity;
+    for (const el of col.querySelectorAll("[data-seq], .day")) el.remove();
+    for (const it of keep) place(it, "end");
   }
 
   function approvalCard(it: Item): HTMLElement {
@@ -447,6 +461,12 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       scroller.scrollTop += scroller.scrollHeight - before;
       loadingOlder = false;
     },
+    historyStart(start) {
+      dropBefore(start);
+    },
+    historySettings(days) {
+      settingsUi?.showHistory(days);
+    },
     memories(list) {
       settingsUi?.showMemories(list);
     },
@@ -468,9 +488,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   });
 
   // cached messages first
-  const cutoff = Math.floor(Date.now() / 1000) - settings.keepDays * 86400;
-  if (settings.keepDays > 0) await store.prune(cutoff, (it) => it.t === "approval");
-  else await store.clearItems();
+  // The device keeps the last 5 days (SPEC §7.5); older messages come from the computer on scroll.
+  await store.prune(Math.floor(Date.now() / 1000) - cacheDays(settings) * 86400, (it) => it.t === "approval");
   const cached = await store.items();
   for (const it of cached) place(it, "end");
   // a pending approval's card stays usable only if no state was recorded for it
@@ -482,7 +501,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // older history on demand
   let loadingOlder = false;
   scroller.addEventListener("scroll", () => {
-    if (scroller.scrollTop < 40 && !loadingOlder && oldest > 1 && oldest !== Infinity && client.computer) {
+    if (scroller.scrollTop < 40 && !loadingOlder && oldest > historyStart && oldest !== Infinity && client.computer) {
       loadingOlder = true;
       void client.send({ t: "history_request", before: oldest, limit: 50 });
     }
@@ -548,10 +567,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     settingsUi = openSettings(store, client, () => (settingsUi = null));
   };
 
-  // keep the cache window: prune once a day while open
+  // keep the cache window: prune every hour while open
   setInterval(() => {
-    if (client.settings.keepDays > 0) void store.prune(Math.floor(Date.now() / 1000) - client.settings.keepDays * 86400, (it) => it.t === "approval");
-  }, 86_400_000);
+    void store.prune(Math.floor(Date.now() / 1000) - cacheDays(client.settings) * 86400, (it) => it.t === "approval");
+  }, 3_600_000);
 
   if ("serviceWorker" in navigator && import.meta.env.PROD) void navigator.serviceWorker.register("/sw.js");
 }
@@ -559,6 +578,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 // ---- settings
 
 interface SettingsUi {
+  showHistory(days: number | null): void;
   showMemories(list: { id: string; text: string }[]): void;
   showDevices(list: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   onReport(msg: { t: string; id: string; text?: string; ok?: boolean; code?: string }): void;
@@ -645,14 +665,17 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
   const memories = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
   const devices = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
-  const keep = h("select", { "aria-label": "Keep messages on this device" }) as HTMLSelectElement;
-  for (const [v, label] of [["30", "30 days"], ["7", "7 days"], ["1", "1 day"], ["0", "Don't keep"]]) {
-    const o = h("option", { value: v }, label) as HTMLOptionElement;
-    if (Number(v) === client.settings.keepDays) o.selected = true;
-    keep.append(o);
-  }
+  // Your history (SPEC §3.8.1): kept on the computer for as long as the person chooses; this device keeps 5 days.
+  const keep = h("select", { "aria-label": "Keep my history", disabled: "" }) as HTMLSelectElement;
+  for (const [days, label] of HISTORY_CHOICES) keep.append(h("option", { value: days === null ? "forever" : String(days) }, label));
+  const showKeep = (days: number | null | undefined) => {
+    if (days === undefined) return;
+    keep.value = days === null ? "forever" : String(days);
+  };
+  showKeep(client.settings.historyDays);
+  const clearHistory = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear");
+  const historyNote = h("p", { class: "fine" }, client.computer ? "" : "Your computer is offline: these need it online.");
   const notify = h("button", { class: "btn", type: "button" }, client.settings.notifications ? "On" : "Turn on");
-  const clearBtn = h("button", { class: "btn", type: "button" }, "Clear");
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
   const reportBtn = h("button", { class: "btn", type: "button" }, "Report");
   const modes = h("div", { class: "segmented", role: "radiogroup", "aria-label": "Appearance" });
@@ -688,14 +711,20 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
       { class: "sheet-in" },
       h("header", {}, h("h2", {}, "Settings"), close),
       h("section", {}, h("h4", {}, "What Aha! remembers about you"), memories, h("p", { class: "fine" }, "To change something, just tell Aha! in the chat.")),
+      h(
+        "section",
+        {},
+        h("h4", {}, "Your history"),
+        h("div", { class: "row" }, h("span", {}, "Keep my history", h("small", {}, "On your computer. This device keeps the last 5 days; scroll up for older messages.")), keep),
+        h("div", { class: "row" }, h("span", {}, "Clear history", h("small", {}, "From your computer and all your devices. Memories, reminders and sign-ins stay.")), clearHistory),
+        historyNote,
+      ),
       h("section", {}, h("h4", {}, "Your devices"), devices),
       h(
         "section",
         {},
         h("h4", {}, "This device"),
-        h("div", { class: "row" }, h("span", {}, "Keep messages on this device", h("small", {}, "Your computer keeps the full history.")), keep),
         h("div", { class: "row" }, h("span", {}, "Notifications", h("small", {}, "They only say “New message from Aha!”.")), notify),
-        h("div", { class: "row" }, h("span", {}, "Clear this device's cache"), clearBtn),
         h("div", { class: "row" }, h("span", {}, "Unpair this device", h("small", {}, "Deletes its keys and cached messages.")), unpair),
       ),
       h("section", {}, h("h4", {}, "Appearance"), modes),
@@ -725,18 +754,32 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   close.onclick = shut;
   dialog.addEventListener("cancel", shut);
   void client.send({ t: "memories_request" });
+  void client.send({ t: "history_settings_request" });
   void client.send({ t: "devices_request" });
 
   keep.onchange = async () => {
-    client.settings = { ...client.settings, keepDays: Number(keep.value) };
-    await store.put("settings", client.settings);
-    if (client.settings.keepDays === 0) await store.clearItems();
-    else await store.prune(Math.floor(Date.now() / 1000) - client.settings.keepDays * 86400, (it) => it.t === "approval");
+    const days = keep.value === "forever" ? null : Number(keep.value);
+    const shorter = days !== null && (client.settings.historyDays == null || days < client.settings.historyDays);
+    const label = keep.selectedOptions[0]?.textContent ?? "";
+    if (shorter && !confirm(`Keep ${label.toLowerCase()} of history? Anything older is deleted from your computer now.`)) {
+      showKeep(client.settings.historyDays);
+      return;
+    }
+    keep.disabled = true;
+    if (!(await client.send({ t: "history_settings_set", days }))) {
+      historyNote.textContent = "Your computer is offline: try again when it's back.";
+      showKeep(client.settings.historyDays);
+      keep.disabled = false;
+    }
   };
-  clearBtn.onclick = async () => {
-    await store.clearItems();
-    await store.put("last", 0);
-    clearBtn.textContent = "Cleared";
+  clearHistory.onclick = async () => {
+    if (!confirm("Delete your chat history from your computer and all your devices? Memories, reminders and sign-ins stay.")) return;
+    clearHistory.disabled = true;
+    if (await client.send({ t: "history_clear" })) clearHistory.textContent = "Cleared";
+    else {
+      historyNote.textContent = "Your computer is offline: try again when it's back.";
+      clearHistory.disabled = false;
+    }
   };
   notify.onclick = async () => {
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !client.vapid) {
@@ -774,6 +817,12 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   };
 
   return {
+    showHistory(days) {
+      showKeep(days);
+      keep.disabled = false;
+      clearHistory.disabled = false;
+      historyNote.textContent = "";
+    },
     onReport(msg) {
       report?.onReport(msg);
     },

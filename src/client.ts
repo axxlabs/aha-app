@@ -361,6 +361,8 @@ export class Client {
       case "sync":
         if (typeof msg.start === "number") await this.dropBefore(msg.start);
         await this.accept((msg.items ?? []) as Item[], false);
+        // Whether a reply is owed now: the `typing` messages sent while this device was offline never came.
+        if (typeof msg.working === "boolean") this.on.typing(msg.working);
         break;
       case "history_start":
         if (typeof msg.start === "number") await this.dropBefore(msg.start);

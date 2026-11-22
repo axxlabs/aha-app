@@ -194,6 +194,7 @@ export function pair(data: PairData, deviceName = defaultDeviceName()): Promise<
 export interface BrowserSite {
   site: string;
   signed_in: boolean;
+  trusted: boolean; // fills in forms there without asking (SPEC §5.7)
 }
 
 /** The computer's `browser` list, keeping only well-formed entries. */
@@ -201,7 +202,7 @@ export function browserSites(raw: unknown): BrowserSite[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((s): s is BrowserSite => !!s && typeof s.site === "string" && s.site.length <= 255)
-    .map((s) => ({ site: s.site, signed_in: s.signed_in === true }));
+    .map((s) => ({ site: s.site, signed_in: s.signed_in === true, trusted: s.trusted === true }));
 }
 
 export interface Events {

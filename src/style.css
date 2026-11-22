@@ -169,3 +169,8 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
   background: var(--accent); color: var(--on-accent); border: 2px solid var(--card); font: 800 13px/22px system-ui, sans-serif;
   text-align: center; pointer-events: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
 .card > .btn { align-self: flex-start; }
+/* Settings → Your browser: a site's Trusted switch and Forget, side by side (SPEC §5.7). */
+.site-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.site-actions input[type="text"] { width: 11em; border: 1px solid var(--line); background: var(--card); color: inherit; border-radius: 10px; padding: 6px 10px; }
+.trust { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
+.trust input { width: 18px; height: 18px; accent-color: var(--accent, currentColor); }

@@ -527,6 +527,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       settingsUi?.onReport(msg);
     },
     error(code) {
+      if (code === "bad_site") settingsUi?.browserNote("That isn't a web site's name. Type it like waitrose.com.");
       if (code === "other_tab") screen(mark(), h("h1", {}, "Aha! is open somewhere else"), h("p", {}, "This device connected again from another tab or window."));
       if (code === "pin") screen(mark(), h("h1", {}, "Gateway key changed"), h("p", { class: "error" }, "The gateway's key no longer matches the one from pairing, so Aha! won't connect. Pair this device again."));
     },
@@ -632,6 +633,7 @@ interface SettingsUi {
   showMemories(list: { id: string; text: string }[]): void;
   showDevices(list: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   showBrowser(list: BrowserSite[]): void;
+  browserNote(text: string): void;
   onReport(msg: { t: string; id: string; text?: string; ok?: boolean; code?: string }): void;
 }
 
@@ -719,6 +721,9 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   // Your browser (SPEC §3.4, §7.4): what Aha!'s browser on the computer remembers for this person.
   const sites = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
   const clearBrowser = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear");
+  const trustInput = h("input", { type: "text", placeholder: "e.g. waitrose.com", "aria-label": "A site to trust", autocapitalize: "off", spellcheck: "false" }) as HTMLInputElement;
+  const trustBtn = h("button", { class: "btn", type: "button" }, "Trust") as HTMLButtonElement;
+  const siteNote = h("p", { class: "fine", hidden: "" });
   // Your history (SPEC §3.8.1): kept on the computer for as long as the person chooses; this device keeps 5 days.
   const keep = h("select", { "aria-label": "Keep my history", disabled: "" }) as HTMLSelectElement;
   for (const [days, label] of HISTORY_CHOICES) keep.append(h("option", { value: days === null ? "forever" : String(days) }, label));
@@ -782,8 +787,10 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         "section",
         {},
         h("h4", {}, "Your browser"),
-        h("p", { class: "fine" }, "Aha!'s browser remembers sites like your own browser does, so you stay signed in."),
+        h("p", { class: "fine" }, "Aha!'s browser remembers sites like your own browser does, so you stay signed in. On trusted sites it fills in forms without asking you first (signing in still uses the card)."),
         sites,
+        h("div", { class: "row" }, h("span", {}, "Trust a site", h("small", {}, "Fills in forms there without asking.")), h("span", { class: "site-actions" }, trustInput, trustBtn)),
+        siteNote,
         h("div", { class: "row" }, h("span", {}, "Clear browser data", h("small", {}, "Signs you out of every site.")), clearBrowser),
       ),
       h("section", {}, h("h4", {}, "Your devices"), devices),
@@ -849,8 +856,23 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
       clearHistory.disabled = false;
     }
   };
+  trustBtn.onclick = async () => {
+    const site = trustInput.value.trim();
+    if (!site) return;
+    siteNote.hidden = true;
+    trustBtn.disabled = true;
+    if (await client.send({ t: "browser_trust", site, trusted: true })) trustInput.value = "";
+    else {
+      trustBtn.disabled = false;
+      siteNote.textContent = "Your computer is offline: try again when it's back.";
+      siteNote.hidden = false;
+    }
+  };
+  trustInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") trustBtn.click();
+  });
   clearBrowser.onclick = async () => {
-    if (!confirm("Clear everything Aha!'s browser remembers? You'll be signed out of every site.")) return;
+    if (!confirm("Clear everything Aha!'s browser remembers? You'll be signed out of every site. Trusted sites stay.")) return;
     clearBrowser.disabled = true;
     if (!(await client.send({ t: "browser_clear" }))) {
       clearBrowser.disabled = false;
@@ -904,12 +926,27 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     },
     showMemories(list) {
       memories.replaceChildren(
-        ...(list.length ? list.map((m) => h("div", { class: "row" }, h("span", {}, m.text))) : [h("p", { class: "fine" }, "Nothing yet.")]),
+        ...(list.length
+          ? list.map((m) => {
+              const forget = h("button", { class: "btn", type: "button" }, "Forget");
+              forget.onclick = async () => {
+                if (!confirm(`Forget “${m.text}”?`)) return;
+                forget.setAttribute("disabled", "");
+                if (!(await client.send({ t: "memory_forget", id: m.id }))) forget.removeAttribute("disabled");
+              };
+              return h("div", { class: "row" }, h("span", {}, m.text), forget);
+            })
+          : [h("p", { class: "fine" }, "Nothing yet.")]),
       );
     },
+    browserNote(text) {
+      siteNote.textContent = text;
+      siteNote.hidden = !text;
+    },
     showBrowser(list) {
-      clearBrowser.disabled = list.length === 0;
+      clearBrowser.disabled = !list.some((s) => !s.trusted || s.signed_in);
       clearBrowser.textContent = "Clear";
+      trustBtn.disabled = false;
       sites.replaceChildren(
         ...(list.length
           ? list.map((s) => {
@@ -919,7 +956,22 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
                 forget.setAttribute("disabled", "");
                 if (!(await client.send({ t: "browser_forget", site: s.site }))) forget.removeAttribute("disabled");
               };
-              return h("div", { class: "row" }, h("span", {}, s.site, ...(s.signed_in ? [h("small", {}, "signed in")] : [])), forget);
+              // Trusted (SPEC §5.7): Aha! fills in forms on this site without asking.
+              const trust = h("input", { type: "checkbox", "aria-label": `Trust ${s.site}` }) as HTMLInputElement;
+              trust.checked = s.trusted;
+              trust.onchange = async () => {
+                trust.disabled = true;
+                if (!(await client.send({ t: "browser_trust", site: s.site, trusted: trust.checked }))) {
+                  trust.checked = !trust.checked;
+                  trust.disabled = false;
+                }
+              };
+              return h(
+                "div",
+                { class: "row" },
+                h("span", {}, s.site, ...(s.signed_in ? [h("small", {}, "signed in")] : [])),
+                h("span", { class: "site-actions" }, h("label", { class: "trust" }, trust, "Trusted"), forget),
+              );
             })
           : [h("p", { class: "fine" }, "Nothing yet.")]),
       );

@@ -24,9 +24,9 @@ describe("pairing links (SPEC §6.4)", () => {
 
 describe("Settings → Your browser (SPEC §3.4, §7.4)", () => {
   it("shows only well-formed sites from the computer", () => {
-    expect(browserSites([{ site: "waitrose.com", signed_in: true }, { site: "news.example", signed_in: "yes" }, { site: 5 }, null, "x"])).toEqual([
-      { site: "waitrose.com", signed_in: true },
-      { site: "news.example", signed_in: false },
+    expect(browserSites([{ site: "waitrose.com", signed_in: true, trusted: true }, { site: "news.example", signed_in: "yes" }, { site: 5 }, null, "x"])).toEqual([
+      { site: "waitrose.com", signed_in: true, trusted: true },
+      { site: "news.example", signed_in: false, trusted: false },
     ]);
     expect(browserSites(undefined)).toEqual([]);
   });

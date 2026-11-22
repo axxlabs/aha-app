@@ -94,7 +94,7 @@ async function boot(): Promise<void> {
 function welcomeScreen(): void {
   screen(
     mark(),
-    h("h1", {}, "Aha! Your private agent."),
+    h("h1", {}, "aha! A Truly Private Personal Assistant"),
     h("p", {}, "To use Aha!, pair this device with your own computer: run ", h("code", {}, "aha pair <your name>"), " there and scan the QR code it shows."),
     h("p", { class: "fine" }, `Messages are end-to-end encrypted between this device and your computer. Version ${APP_VERSION} (${BUILD}).`),
   );

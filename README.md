@@ -1,6 +1,6 @@
 # aha-app
 
-The **Aha!** app: one private conversation with Aha! Your private agent, which runs on your own computer
+The **Aha!** app: one private conversation with **aha! A Truly Private Personal Assistant**, which runs on your own computer
 ([aha-local-llm](https://github.com/axxlabs/aha-local-llm)). It's an installable web app (add it to your home
 screen); store versions come later.
 

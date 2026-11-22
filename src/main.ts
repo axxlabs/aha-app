@@ -674,7 +674,12 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   };
   showKeep(client.settings.historyDays);
   const clearHistory = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear");
-  const historyNote = h("p", { class: "fine" }, client.computer ? "" : "Your computer is offline: these need it online.");
+  const historyNote = h("p", { class: "fine" });
+  const note = (text: string) => {
+    historyNote.textContent = text;
+    historyNote.hidden = !text;
+  };
+  note(client.computer ? "" : "Your computer is offline: these need it online.");
   const notify = h("button", { class: "btn", type: "button" }, client.settings.notifications ? "On" : "Turn on");
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
   const reportBtn = h("button", { class: "btn", type: "button" }, "Report");
@@ -767,7 +772,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     }
     keep.disabled = true;
     if (!(await client.send({ t: "history_settings_set", days }))) {
-      historyNote.textContent = "Your computer is offline: try again when it's back.";
+      note("Your computer is offline: try again when it's back.");
       showKeep(client.settings.historyDays);
       keep.disabled = false;
     }
@@ -777,7 +782,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     clearHistory.disabled = true;
     if (await client.send({ t: "history_clear" })) clearHistory.textContent = "Cleared";
     else {
-      historyNote.textContent = "Your computer is offline: try again when it's back.";
+      note("Your computer is offline: try again when it's back.");
       clearHistory.disabled = false;
     }
   };
@@ -821,7 +826,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
       showKeep(days);
       keep.disabled = false;
       clearHistory.disabled = false;
-      historyNote.textContent = "";
+      note("");
     },
     onReport(msg) {
       report?.onReport(msg);

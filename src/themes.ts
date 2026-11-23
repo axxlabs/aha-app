@@ -12,12 +12,12 @@ export interface Theme {
 }
 
 export const THEMES: Theme[] = [
-  { id: "saffron-hour", name: "Saffron Hour", swatch: "#E8A33D", light: "#FAF8F4", dark: "#151412" },
-  { id: "sea-glass", name: "Sea Glass", swatch: "#2A9D8F", light: "#F4F8F7", dark: "#111615" },
-  { id: "lavender-haze", name: "Lavender Haze", swatch: "#7C68D9", light: "#F8F6FB", dark: "#141218" },
-  { id: "terracotta-sun", name: "Terracotta Sun", swatch: "#C95F33", light: "#FBF6F3", dark: "#171211" },
-  { id: "fern-hollow", name: "Fern Hollow", swatch: "#4F8A3E", light: "#F6F8F3", dark: "#121510" },
-  { id: "midnight-ink", name: "Midnight Ink", swatch: "#3563C9", light: "#F5F7FB", dark: "#101318" },
+  { id: "saffron-hour", name: "Blaze Rod", swatch: "#E8A33D", light: "#FAF8F4", dark: "#151412" },
+  { id: "sea-glass", name: "Prismarine", swatch: "#2A9D8F", light: "#F4F8F7", dark: "#111615" },
+  { id: "lavender-haze", name: "Amethyst", swatch: "#7C68D9", light: "#F8F6FB", dark: "#141218" },
+  { id: "terracotta-sun", name: "Copper", swatch: "#C95F33", light: "#FBF6F3", dark: "#171211" },
+  { id: "fern-hollow", name: "Moss", swatch: "#4F8A3E", light: "#F6F8F3", dark: "#121510" },
+  { id: "midnight-ink", name: "Lapis", swatch: "#3563C9", light: "#F5F7FB", dark: "#101318" },
 ];
 
 export const DEFAULT_THEME = THEMES[0].id;

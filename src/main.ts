@@ -660,6 +660,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 
   let settingsUi: SettingsUi | null = null;
   menu.onclick = () => {
+    if (settingsUi) return settingsUi.close(); // the menu button toggles the side pane
     settingsUi = openSettings(store, client, () => (settingsUi = null));
   };
 
@@ -784,6 +785,7 @@ interface SettingsUi {
   modelNote(text: string): void;
   browserNote(text: string): void;
   onReport(msg: { t: string; id: string; text?: string; ok?: boolean; code?: string }): void;
+  close(): void;
 }
 
 const REPORT_ERRORS: Record<string, string> = {
@@ -862,6 +864,8 @@ function reportView(client: Client, back: () => void) {
     },
   };
 }
+
+const PANE_MEDIA = "(min-width: 1000px)"; // keep in step with style.css
 
 function openSettings(store: Store, client: Client, onClose: () => void): SettingsUi {
   const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
@@ -1001,14 +1005,31 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     ),
   ) as HTMLDialogElement;
   document.body.append(dialog);
-  dialog.showModal();
+  // On a wide screen Settings is a pane beside the chat, which stays usable; on a narrow one, a sheet over it.
+  const wide = matchMedia(PANE_MEDIA);
+  const place = () => {
+    if (dialog.open) dialog.close();
+    document.body.classList.toggle("with-pane", wide.matches);
+    if (wide.matches) dialog.show();
+    else dialog.showModal();
+  };
+  place();
+  wide.addEventListener("change", place);
   const shut = () => {
+    wide.removeEventListener("change", place);
+    document.body.classList.remove("with-pane");
     dialog.close();
     dialog.remove();
     onClose();
   };
   close.onclick = shut;
-  dialog.addEventListener("cancel", shut);
+  dialog.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    shut();
+  });
+  dialog.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !dialog.matches(":modal")) shut();
+  });
   void client.send({ t: "memories_request" });
   void client.send({ t: "history_settings_request" });
   void client.send({ t: "devices_request" });
@@ -1110,6 +1131,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   };
 
   return {
+    close: shut,
     showModel(m) {
       models = m.choices;
       currentModel = m.current;

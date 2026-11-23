@@ -7,7 +7,10 @@
 import * as c from "./crypto";
 import type { Item, Photo, Store } from "./store";
 
-export const APP_VERSION = "0.2.0";
+// SPEC §10.2: "hot-staging" for now, named by the build's commit; an incremental release number once releases start.
+export const APP_VERSION = "hot-staging";
+declare const __BUILD__: string;
+const APP_BUILD = typeof __BUILD__ === "string" ? __BUILD__ : "dev";
 const enc = new TextEncoder();
 
 export interface PairData {
@@ -361,7 +364,7 @@ export class Client {
     if (!online) return;
     if (!this.helloSent) {
       this.helloSent = true;
-      await this.send({ t: "hello", name: this.identity.deviceName, version: APP_VERSION, ...(await this.pushField()) });
+      await this.send({ t: "hello", name: this.identity.deviceName, version: `${APP_VERSION} (${APP_BUILD})`, ...(await this.pushField()) });
     }
     await this.send({ t: "sync_request", after: this.last, ...(this.last === 0 ? { days: cacheDays(this.settings) } : {}) });
     for (const m of await this.store.outbox()) await this.send({ t: "say", text: m.text, cid: m.cid, ...(m.image ? { image: m.image } : {}) });

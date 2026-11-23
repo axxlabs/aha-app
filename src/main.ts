@@ -892,7 +892,7 @@ function reportView(client: Client, back: () => void) {
   for (const input of [note, count, details]) input.addEventListener("input", reset);
   previewBtn.onclick = async () => {
     status.textContent = "";
-    const ok = await client.send({ t: "report_preview", count: Number(count.value), note: note.value, details: details.checked, app: APP_VERSION });
+    const ok = await client.send({ t: "report_preview", count: Number(count.value), note: note.value, details: details.checked, app: `${APP_VERSION} (${BUILD})` });
     status.textContent = ok ? "Asking your computer for the report…" : "Your computer is offline. Reports are built there, so try again when it's online.";
   };
   sendBtn.onclick = async () => {
@@ -1191,7 +1191,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlDecode(client.vapid) as BufferSource });
     client.settings = { ...client.settings, notifications: true };
     await store.put("settings", client.settings);
-    await client.send({ t: "hello", name: client.identity.deviceName, version: APP_VERSION, push: sub.toJSON() });
+    await client.send({ t: "hello", name: client.identity.deviceName, version: `${APP_VERSION} (${BUILD})`, push: sub.toJSON() });
     notify.textContent = "On";
   };
   const inner = dialog.querySelector(".sheet-in") as HTMLElement;

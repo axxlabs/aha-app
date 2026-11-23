@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, HISTORY_CHOICES, browserSites, cacheDays, gatewayProved, modelChoices, parsePairLink, shortFingerprint } from "../src/client";
+import { DEFAULT_SETTINGS, HISTORY_CHOICES, browserSites, cacheDays, gatewayProved, modelChoices, traceEvents, traceTime, parsePairLink, shortFingerprint } from "../src/client";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import * as c from "../src/crypto";
 
@@ -38,6 +38,15 @@ describe("Settings → Model (SPEC §3.2)", () => {
       modelChoices({ current: "qwen3.5-9b", choices: [{ id: "qwen3.5-9b", name: "Qwen3.5 9B", note: "Faster", ready: true }, { id: "x", name: 5 }, null, { id: "y", name: "Y", ready: "yes" }] }),
     ).toEqual({ current: "qwen3.5-9b", choices: [{ id: "qwen3.5-9b", name: "Qwen3.5 9B", note: "Faster", ready: true }, { id: "y", name: "Y", note: "", ready: false }] });
     expect(modelChoices(undefined)).toEqual({ current: "", choices: [] });
+  });
+});
+
+describe("a message's details (SPEC §3.8)", () => {
+  it("keeps well-formed records and reads the transcript's times", () => {
+    expect(traceEvents([{ ts: "2026-11-23T08:41:02+0000", kind: "model", ms: 900 }, { kind: "tool" }, null, "x"])).toEqual([{ ts: "2026-11-23T08:41:02+0000", kind: "model", ms: 900 }]);
+    expect(traceEvents(undefined)).toEqual([]);
+    expect(traceTime("2026-11-23T08:41:02+0000")).toBe(Date.UTC(2026, 10, 23, 8, 41, 2));
+    expect(traceTime("2026-11-23T08:41:02-0130")).toBe(Date.UTC(2026, 10, 23, 10, 11, 2));
   });
 });
 

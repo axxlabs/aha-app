@@ -5,7 +5,7 @@
 
 import "./style.css";
 import { APPEARANCES, THEMES, applyTheme } from "./themes";
-import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type ModelChoice, type Identity, type Settings, pair, parsePairLink } from "./client";
+import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type ModelChoice, type TraceEvent, traceTime, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
@@ -231,6 +231,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     return new Date(ts * 1000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
   }
 
+  let detailsUi: { seq: number; show(events: TraceEvent[]): void } | null = null;
+
   function node(it: Item): HTMLElement | null {
     if (it.t === "msg" && it.role === "me") {
       const el = h("div", { class: "me" }, String(it.text ?? ""));
@@ -243,10 +245,36 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       el.innerHTML = render(String(it.text ?? "")); // markdown-it with html disabled (src/markdown.ts)
       const img = it.image as { mime?: string; b64?: string } | undefined;
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
+      el.append(messageMenu(it.seq));
       return el;
     }
     if (it.t === "approval") return approvalCard(it);
     return null;
+  }
+
+  /** ⋯ under each of Aha!'s messages: Show details (SPEC §3.8). */
+  function messageMenu(seq: number): HTMLElement {
+    const more = h("button", { class: "more", type: "button", "aria-label": "More", "aria-haspopup": "menu", "aria-expanded": "false" }, icon(ICONS.menu));
+    const show = h("button", { type: "button", role: "menuitem" }, "Show details");
+    const pop = h("div", { class: "more-menu", role: "menu", hidden: "" }, show);
+    const shut = (e?: Event) => {
+      if (e && wrap.contains(e.target as Node)) return;
+      pop.hidden = true;
+      more.setAttribute("aria-expanded", "false");
+      document.removeEventListener("click", shut);
+    };
+    more.onclick = () => {
+      if (!pop.hidden) return shut();
+      pop.hidden = false;
+      more.setAttribute("aria-expanded", "true");
+      setTimeout(() => document.addEventListener("click", shut));
+    };
+    show.onclick = () => {
+      shut();
+      detailsUi = openDetails(client, seq, () => (detailsUi = null));
+    };
+    const wrap = h("div", { class: "more-wrap" }, more, pop);
+    return wrap;
   }
 
   function place(it: Item, where: "end" | "start"): void {
@@ -526,6 +554,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     model(m) {
       settingsUi?.showModel(m);
     },
+    trace(seq, events) {
+      if (detailsUi?.seq === seq) detailsUi.show(events);
+    },
     report(msg) {
       settingsUi?.onReport(msg);
     },
@@ -628,6 +659,108 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   }, 3_600_000);
 
   if ("serviceWorker" in navigator && import.meta.env.PROD) void navigator.serviceWorker.register("/sw.js");
+}
+
+// ---- a message's details (SPEC §3.8)
+
+const CHECKS: Record<string, string> = {
+  numbers: "a number it couldn't find on a page",
+  site: "it said it did something on a site without doing it",
+  blank: "it gave up on a new, blank browser window",
+};
+
+function seconds(ms: unknown): string {
+  return typeof ms === "number" ? `${(ms / 1000).toFixed(1)} s` : "";
+}
+
+function block(label: string, text: unknown, open = true): HTMLElement | null {
+  if (typeof text !== "string" || !text.trim()) return null;
+  const d = h("details", {}, h("summary", {}, label), h("pre", { class: "report-draft" }, text));
+  d.open = open;
+  return d;
+}
+
+/** One record, drawn: its time and what it was, then what it said. */
+function traceRow(e: TraceEvent): HTMLElement {
+  const at = traceTime(e.ts);
+  const time = Number.isNaN(at) ? e.ts : new Date(at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const parts: (HTMLElement | null)[] = [];
+  let title = e.kind;
+  let meta = "";
+  if (e.kind === "model") {
+    title = `Model · ${String(e.model ?? "")}`;
+    const t = (e.timings ?? {}) as Record<string, number>;
+    meta = [
+      seconds(e.ms),
+      `${Number(e.prompt_tokens ?? 0).toLocaleString()} prompt tokens (${Number(e.cached_tokens ?? 0).toLocaleString()} cached)`,
+      t.prompt_ms !== undefined ? `read ${Number(t.prompt_n ?? 0).toLocaleString()} in ${seconds(t.prompt_ms)}` : "",
+      t.predicted_ms !== undefined ? `wrote ${Number(t.predicted_n ?? 0).toLocaleString()} in ${seconds(t.predicted_ms)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    parts.push(block("Thinking", e.reasoning, false), block("Wrote", e.text));
+    for (const c of Array.isArray(e.calls) ? (e.calls as { name?: string; args?: string }[]) : []) parts.push(block(`Called ${String(c.name ?? "")}`, c.args || "{}"));
+  } else if (e.kind === "tool") {
+    title = `Tool · ${String(e.name ?? "")}${e.error ? " · error" : ""}`;
+    parts.push(block("Arguments", e.args, false), block("Result", e.result, false));
+  } else if (e.kind === "check") {
+    title = "Check";
+    meta = `Sent the draft back: ${CHECKS[String(e.name)] ?? String(e.name)}`;
+  } else if (e.kind === "user") {
+    title = "You said";
+    parts.push(block("Message", e.text));
+  } else if (e.kind === "item") {
+    title = e.t === "approval" ? "Card shown" : "Sent to the chat";
+    parts.push(block("Text", e.text, false));
+  } else if (e.kind === "answer") {
+    title = "Task finished";
+  } else if (e.kind === "stopped") {
+    title = "Stopped";
+  }
+  return h(
+    "div",
+    { class: "trace-row" },
+    h("div", { class: "trace-head" }, h("time", {}, time), h("b", {}, title)),
+    ...(meta ? [h("small", {}, meta)] : []),
+    ...parts.filter((p): p is HTMLElement => p !== null),
+  );
+}
+
+/** ⋯ → Show details: everything the model wrote and called for this message, with times. */
+function openDetails(client: Client, seq: number, onClose: () => void) {
+  const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
+  const copy = h("button", { class: "btn", type: "button", hidden: "" }, "Copy all");
+  const body = h("div", { class: "trace" }, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline: details need it online."));
+  const dialog = h(
+    "dialog",
+    { class: "sheet", "aria-label": "Message details" },
+    h("div", { class: "sheet-in" }, h("header", {}, h("h2", {}, "Details"), close), h("p", { class: "fine" }, "What the model wrote, thought and called for this message, from your computer."), body, copy),
+  ) as HTMLDialogElement;
+  document.body.append(dialog);
+  dialog.showModal();
+  const shut = () => {
+    dialog.close();
+    dialog.remove();
+    onClose();
+  };
+  close.onclick = shut;
+  dialog.addEventListener("cancel", shut);
+  void client.send({ t: "trace_request", seq });
+  return {
+    seq,
+    show(events: TraceEvent[]) {
+      if (!events.length) {
+        body.replaceChildren(h("p", { class: "fine" }, "No details were kept for this message. Messages from before this version, and ones not from a task, have none."));
+        return;
+      }
+      body.replaceChildren(...events.map(traceRow));
+      copy.hidden = false;
+      copy.onclick = async () => {
+        await navigator.clipboard.writeText(JSON.stringify(events, null, 1));
+        copy.textContent = "Copied";
+      };
+    },
+  };
 }
 
 // ---- settings

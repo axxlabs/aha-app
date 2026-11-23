@@ -174,3 +174,18 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .site-actions input[type="text"] { width: 11em; border: 1px solid var(--line); background: var(--card); color: inherit; border-radius: 10px; padding: 6px 10px; }
 .trust { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
 .trust input { width: 18px; height: 18px; accent-color: var(--accent, currentColor); }
+/* ⋯ under Aha!'s messages, and a message's details (SPEC §3.8) */
+.more-wrap { position: relative; display: flex; justify-content: flex-start; margin-top: 2px; }
+.more { border: 0; background: none; color: var(--muted); padding: 2px 6px; border-radius: 8px; opacity: .55; display: inline-flex; }
+.more:hover, .more[aria-expanded="true"] { opacity: 1; background: var(--soft); }
+.more-menu { position: absolute; top: 100%; left: 0; z-index: 5; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 4px; box-shadow: 0 6px 24px rgba(0,0,0,.14); }
+.more-menu button { border: 0; background: none; color: inherit; font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 8px; white-space: nowrap; }
+.more-menu button:hover { background: var(--soft); }
+.trace { display: flex; flex-direction: column; gap: 12px; }
+.trace-row { display: flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--line); padding-left: 10px; }
+.trace-head { display: flex; gap: 8px; align-items: baseline; }
+.trace-head time { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+.trace-row small { color: var(--muted); font-size: 12px; }
+.trace-row summary { font-size: 13px; cursor: pointer; color: var(--muted); }
+.trace-row .report-draft { max-height: 50vh; margin-top: 4px; }

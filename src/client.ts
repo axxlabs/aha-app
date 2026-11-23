@@ -216,6 +216,24 @@ export function modelChoices(raw: unknown): { current: string; choices: ModelCho
   return { current: typeof m.current === "string" ? m.current : "", choices };
 }
 
+/** One record of the task behind a message (SPEC §3.8, ⋯ → Show details): a model call, a tool, a check… */
+export interface TraceEvent {
+  ts: string;
+  kind: string;
+  [k: string]: unknown;
+}
+
+/** The computer's `trace` events, keeping only well-formed ones. */
+export function traceEvents(raw: unknown): TraceEvent[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((e): e is TraceEvent => !!e && typeof e === "object" && typeof e.kind === "string" && typeof e.ts === "string");
+}
+
+/** A transcript time ("2026-11-23T08:41:02+0000") as epoch milliseconds, or NaN. */
+export function traceTime(ts: string): number {
+  return Date.parse(ts.replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
+}
+
 /** The computer's `browser` list, keeping only well-formed entries. */
 export function browserSites(raw: unknown): BrowserSite[] {
   if (!Array.isArray(raw)) return [];
@@ -235,6 +253,7 @@ export interface Events {
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   browser(sites: BrowserSite[]): void;
   model(m: { current: string; choices: ModelChoice[] }): void;
+  trace(seq: number, events: TraceEvent[]): void;
   error(code: string): void;
   revoked(): void;
   report(msg: { t: "report_draft" | "report_sent"; id: string; text?: string; ok?: boolean; code?: string }): void;
@@ -409,6 +428,9 @@ export class Client {
         break;
       case "model":
         this.on.model(modelChoices(msg));
+        break;
+      case "trace":
+        if (typeof msg.seq === "number") this.on.trace(msg.seq, traceEvents(msg.events));
         break;
       case "cert":
         if (msg.cert && certValid(msg.cert, this.identity.pin) && msg.cert.device === this.dev) {

@@ -1201,7 +1201,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     inner.append(report.el);
   };
   unpair.onclick = async () => {
-    if (!confirm("Unpair this device? Its keys and cached messages will be deleted.")) return;
+    if (!confirm("Unpair this device? It won't be able to reach Aha! any more, and its keys and cached messages will be deleted. Pair it again with a new QR code.")) return;
     await client.send({ t: "revoke_device", device: client.dev });
     client.stop();
     await store.wipe();
@@ -1298,13 +1298,14 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         ...list.map((d) => {
           const seen = d.last_seen ? new Date(d.last_seen * 1000).toLocaleString() : "never";
           const row = h("div", { class: "row" }, h("span", {}, d.name + (d.this ? " (this device)" : ""), h("small", {}, `last seen ${seen}`)));
-          if (!d.this) {
-            const b = h("button", { class: "btn danger", type: "button" }, "Revoke");
-            b.onclick = async () => {
-              if (confirm(`Revoke “${d.name}”? It won't be able to reach Aha! any more.`)) await client.send({ t: "revoke_device", device: d.id });
-            };
-            row.append(b);
-          }
+          const b = h("button", { class: "btn danger", type: "button" }, "Revoke");
+          // This device too: the same as Unpair (its keys and cached messages are deleted here).
+          b.onclick = d.this
+            ? () => unpair.click()
+            : async () => {
+                if (confirm(`Revoke “${d.name}”? It won't be able to reach Aha! any more.`)) await client.send({ t: "revoke_device", device: d.id });
+              };
+          row.append(b);
           return row;
         }),
       );

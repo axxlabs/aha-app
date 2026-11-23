@@ -7,7 +7,7 @@ import { DEFAULT_THEME, THEMES, themeById } from "../src/themes";
 describe("colour themes (SPEC §7.4)", () => {
   const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
   it("has six named themes, Blaze Rod first", () => {
-    expect(THEMES.map((t) => t.name)).toEqual(["Blaze Rod", "Prismarine", "Amethyst", "Copper", "Moss", "Lapis"]);
+    expect(THEMES.map((t) => t.name)).toEqual(["Blaze Rod", "Prismarine", "Amethyst", "Red Sandstone", "Moss", "Lapis"]);
     expect(DEFAULT_THEME).toBe("saffron-hour");
   });
   it("every theme but the default has a light and a dark palette in the CSS", () => {

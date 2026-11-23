@@ -245,7 +245,7 @@ export function browserSites(raw: unknown): BrowserSite[] {
 
 export interface Events {
   item(it: Item, live: boolean): void;
-  typing(on: boolean): void;
+  typing(on: boolean, queued?: boolean): void; // queued: waiting while someone else's request runs
   status(s: { connected: boolean; computer: boolean }): void;
   history(items: Item[]): void;
   historyStart(start: number): void; // items before `start` were deleted on the computer
@@ -397,7 +397,7 @@ export class Client {
         await this.accept([msg as unknown as Item], true);
         break;
       case "typing":
-        this.on.typing(!!msg.on);
+        this.on.typing(!!msg.on, msg.queued === true);
         break;
       case "sync":
         if (typeof msg.start === "number") await this.dropBefore(msg.start);

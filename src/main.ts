@@ -249,7 +249,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     location.href = url;
   });
   const scroller = h("main", { class: "chat" }, col);
-  const working = h("div", { class: "working", hidden: "", role: "status" }, h("i"), h("i"), h("i"), " Aha! is working…");
+  const workingText = h("span", {}, " Aha! is working…");
+  const working = h("div", { class: "working", hidden: "", role: "status" }, h("i"), h("i"), h("i"), workingText);
   const input = h("textarea", { rows: "1", placeholder: "Ask Aha! anything", "aria-label": "Message", enterkeyhint: "enter", maxlength: "20000" }) as HTMLTextAreaElement;
   const sendBtn = h("button", { class: "send", type: "submit", "aria-label": "Send" }, icon(ICONS.send));
   const photoBtn = h("button", { class: "attach", type: "button", "aria-label": "Add a photo" }, icon(ICONS.photo));
@@ -573,7 +574,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       if (live && ((it.t === "msg" && it.role === "aha") || it.t === "approval")) setBusy(false);
       if (stick || live) toBottom();
     },
-    typing(on) {
+    typing(on, queued) {
+      // The model answers one request at a time for the household (SPEC §3.3): say when it's someone else's turn.
+      workingText.textContent = queued ? " Aha! is finishing someone else's request first…" : " Aha! is working…";
       setBusy(on);
     },
     status(s) {

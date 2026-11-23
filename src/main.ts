@@ -873,7 +873,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   const devices = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
   // Your browser (SPEC §3.4, §7.4): what Aha!'s browser on the computer remembers for this person.
   const sites = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
-  const clearBrowser = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear");
+  const clearBrowser = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear browser");
   const trustInput = h("input", { type: "text", placeholder: "e.g. waitrose.com", "aria-label": "A site to trust", autocapitalize: "off", spellcheck: "false" }) as HTMLInputElement;
   const trustBtn = h("button", { class: "btn", type: "button" }, "Trust") as HTMLButtonElement;
   const siteNote = h("p", { class: "fine", hidden: "" });
@@ -898,7 +898,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     keep.value = days === null ? "forever" : String(days);
   };
   showKeep(client.settings.historyDays);
-  const clearHistory = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear");
+  const clearHistory = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear chat history");
   const historyNote = h("p", { class: "fine" });
   const note = (text: string) => {
     historyNote.textContent = text;
@@ -957,7 +957,6 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         {},
         h("h4", {}, "Your history"),
         h("div", { class: "row" }, h("span", {}, "Keep my history", h("small", {}, "On your computer. This device keeps the last 5 days; scroll up for older messages.")), keep),
-        h("div", { class: "row" }, h("span", {}, "Clear history", h("small", {}, "From your computer and all your devices. Memories, reminders and sign-ins stay.")), clearHistory),
         historyNote,
       ),
       h(
@@ -968,7 +967,6 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         sites,
         h("div", { class: "row" }, h("span", {}, "Trust a site", h("small", {}, "Fills in forms there without asking.")), h("span", { class: "site-actions" }, trustInput, trustBtn)),
         siteNote,
-        h("div", { class: "row" }, h("span", {}, "Clear browser data", h("small", {}, "Signs you out of every site.")), clearBrowser),
       ),
       h("section", {}, h("h4", {}, "Your devices"), devices),
       h(
@@ -978,6 +976,13 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         h("div", { class: "row" }, h("span", {}, "Aha!'s model", modelAbout), model),
         h("p", { class: "fine" }, "For everyone in your household. The first reply after a change takes a little longer while it loads."),
         modelNote,
+      ),
+      h(
+        "section",
+        {},
+        h("h4", {}, "Clear"),
+        h("div", { class: "row" }, h("span", {}, "Chat history", h("small", {}, "From your computer and all your devices. Memories, reminders and sign-ins stay.")), clearHistory),
+        h("div", { class: "row" }, h("span", {}, "Browser data", h("small", {}, "Everything Aha!'s browser remembers: signs you out of every site. Trusted sites stay.")), clearBrowser),
       ),
       h(
         "section",
@@ -1066,7 +1071,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   clearHistory.onclick = async () => {
     if (!confirm("Delete your chat history from your computer and all your devices? Memories, reminders and sign-ins stay.")) return;
     clearHistory.disabled = true;
-    if (await client.send({ t: "history_clear" })) clearHistory.textContent = "Cleared";
+    if (await client.send({ t: "history_clear" })) clearHistory.textContent = "Chat history cleared";
     else {
       note("Your computer is offline: try again when it's back.");
       clearHistory.disabled = false;
@@ -1178,7 +1183,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     },
     showBrowser(list) {
       clearBrowser.disabled = !list.some((s) => !s.trusted || s.signed_in);
-      clearBrowser.textContent = "Clear";
+      clearBrowser.textContent = "Clear browser";
       trustBtn.disabled = false;
       sites.replaceChildren(
         ...(list.length

@@ -82,6 +82,7 @@ a { color: inherit; text-underline-offset: 3px; }
 .composer textarea { flex: 1; resize: none; max-height: 40vh; border: 1px solid var(--line); background: var(--card);
   border-radius: 22px; padding: 10px 16px; outline: none; }
 .composer textarea:focus { border-color: var(--accent); }
+.composer textarea { scrollbar-width: none; } .composer textarea::-webkit-scrollbar { display: none; }
 .send { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent);
   display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .send.stop { background: var(--ink); color: var(--bg); }

@@ -919,7 +919,7 @@ function reportView(client: Client, back: () => void) {
   };
 }
 
-const PANE_MEDIA = "(min-width: 1000px)"; // keep in step with style.css
+const PANE_MEDIA = "(min-width: 1400px)"; // 30% of it is at least the sheet's 420px; keep in step with style.css
 
 function openSettings(store: Store, client: Client, onClose: () => void): SettingsUi {
   const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));

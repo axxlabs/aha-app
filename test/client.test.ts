@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, HISTORY_CHOICES, browserSites, cacheDays, gatewayProved, parsePairLink, shortFingerprint } from "../src/client";
+import { DEFAULT_SETTINGS, HISTORY_CHOICES, browserSites, cacheDays, gatewayProved, modelChoices, parsePairLink, shortFingerprint } from "../src/client";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import * as c from "../src/crypto";
 
@@ -29,6 +29,15 @@ describe("Settings → Your browser (SPEC §3.4, §7.4)", () => {
       { site: "news.example", signed_in: false, trusted: false },
     ]);
     expect(browserSites(undefined)).toEqual([]);
+  });
+});
+
+describe("Settings → Model (SPEC §3.2)", () => {
+  it("shows only well-formed models from the computer", () => {
+    expect(
+      modelChoices({ current: "qwen3.5-9b", choices: [{ id: "qwen3.5-9b", name: "Qwen3.5 9B", note: "Faster", ready: true }, { id: "x", name: 5 }, null, { id: "y", name: "Y", ready: "yes" }] }),
+    ).toEqual({ current: "qwen3.5-9b", choices: [{ id: "qwen3.5-9b", name: "Qwen3.5 9B", note: "Faster", ready: true }, { id: "y", name: "Y", note: "", ready: false }] });
+    expect(modelChoices(undefined)).toEqual({ current: "", choices: [] });
   });
 });
 

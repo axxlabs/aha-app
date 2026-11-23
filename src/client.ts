@@ -197,6 +197,25 @@ export interface BrowserSite {
   trusted: boolean; // fills in forms there without asking (SPEC §5.7)
 }
 
+/** A model the computer can run (SPEC §3.2, Settings → Model). */
+export interface ModelChoice {
+  id: string;
+  name: string;
+  note: string;
+  ready: boolean;
+}
+
+/** The computer's `model` message, keeping only well-formed entries. */
+export function modelChoices(raw: unknown): { current: string; choices: ModelChoice[] } {
+  const m = (raw ?? {}) as { current?: unknown; choices?: unknown };
+  const choices = Array.isArray(m.choices)
+    ? m.choices
+        .filter((c): c is ModelChoice => !!c && typeof c.id === "string" && typeof c.name === "string" && c.id.length <= 64)
+        .map((c) => ({ id: c.id, name: c.name, note: typeof c.note === "string" ? c.note : "", ready: c.ready === true }))
+    : [];
+  return { current: typeof m.current === "string" ? m.current : "", choices };
+}
+
 /** The computer's `browser` list, keeping only well-formed entries. */
 export function browserSites(raw: unknown): BrowserSite[] {
   if (!Array.isArray(raw)) return [];
@@ -215,6 +234,7 @@ export interface Events {
   memories(items: { id: string; text: string }[]): void;
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   browser(sites: BrowserSite[]): void;
+  model(m: { current: string; choices: ModelChoice[] }): void;
   error(code: string): void;
   revoked(): void;
   report(msg: { t: "report_draft" | "report_sent"; id: string; text?: string; ok?: boolean; code?: string }): void;
@@ -386,6 +406,9 @@ export class Client {
         break;
       case "browser":
         this.on.browser(browserSites(msg.sites));
+        break;
+      case "model":
+        this.on.model(modelChoices(msg));
         break;
       case "cert":
         if (msg.cert && certValid(msg.cert, this.identity.pin) && msg.cert.device === this.dev) {

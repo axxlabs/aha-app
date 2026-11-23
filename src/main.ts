@@ -5,7 +5,7 @@
 
 import "./style.css";
 import { APPEARANCES, THEMES, applyTheme } from "./themes";
-import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type Identity, type Settings, pair, parsePairLink } from "./client";
+import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type ModelChoice, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
@@ -523,10 +523,14 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     browser(list) {
       settingsUi?.showBrowser(list);
     },
+    model(m) {
+      settingsUi?.showModel(m);
+    },
     report(msg) {
       settingsUi?.onReport(msg);
     },
     error(code) {
+      if (code === "bad_model") settingsUi?.modelNote("That model isn't on your computer. Run `aha models` there to download it.");
       if (code === "bad_site") settingsUi?.browserNote("That isn't a web site's name. Type it like waitrose.com.");
       if (code === "other_tab") screen(mark(), h("h1", {}, "Aha! is open somewhere else"), h("p", {}, "This device connected again from another tab or window."));
       if (code === "pin") screen(mark(), h("h1", {}, "Gateway key changed"), h("p", { class: "error" }, "The gateway's key no longer matches the one from pairing, so Aha! won't connect. Pair this device again."));
@@ -633,6 +637,8 @@ interface SettingsUi {
   showMemories(list: { id: string; text: string }[]): void;
   showDevices(list: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   showBrowser(list: BrowserSite[]): void;
+  showModel(m: { current: string; choices: ModelChoice[] }): void;
+  modelNote(text: string): void;
   browserNote(text: string): void;
   onReport(msg: { t: string; id: string; text?: string; ok?: boolean; code?: string }): void;
 }
@@ -724,6 +730,19 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   const trustInput = h("input", { type: "text", placeholder: "e.g. waitrose.com", "aria-label": "A site to trust", autocapitalize: "off", spellcheck: "false" }) as HTMLInputElement;
   const trustBtn = h("button", { class: "btn", type: "button" }, "Trust") as HTMLButtonElement;
   const siteNote = h("p", { class: "fine", hidden: "" });
+  // Model (SPEC §3.2): one choice for the whole household, since there is one graphics card.
+  const model = h("select", { "aria-label": "Model", disabled: "" }) as HTMLSelectElement;
+  const modelAbout = h("small", {}, client.computer ? "Loading…" : "Your computer is offline.");
+  const modelNote = h("p", { class: "fine", hidden: "" });
+  let models: ModelChoice[] = [];
+  let currentModel = "";
+  const setModelNote = (text: string) => {
+    modelNote.textContent = text;
+    modelNote.hidden = !text;
+  };
+  const describeModel = (id: string) => {
+    modelAbout.textContent = models.find((m) => m.id === id)?.note ?? "";
+  };
   // Your history (SPEC §3.8.1): kept on the computer for as long as the person chooses; this device keeps 5 days.
   const keep = h("select", { "aria-label": "Keep my history", disabled: "" }) as HTMLSelectElement;
   for (const [days, label] of HISTORY_CHOICES) keep.append(h("option", { value: days === null ? "forever" : String(days) }, label));
@@ -797,6 +816,14 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
       h(
         "section",
         {},
+        h("h4", {}, "Model"),
+        h("div", { class: "row" }, h("span", {}, "Aha!'s model", modelAbout), model),
+        h("p", { class: "fine" }, "For everyone in your household. The first reply after a change takes a little longer while it loads."),
+        modelNote,
+      ),
+      h(
+        "section",
+        {},
         h("h4", {}, "This device"),
         h("div", { class: "row" }, h("span", {}, "Notifications", h("small", {}, "They only say “New message from Aha!”.")), notify),
         h("div", { class: "row" }, h("span", {}, "Unpair this device", h("small", {}, "Deletes its keys and cached messages.")), unpair),
@@ -831,7 +858,20 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   void client.send({ t: "history_settings_request" });
   void client.send({ t: "devices_request" });
   void client.send({ t: "browser_request" });
+  void client.send({ t: "model_request" });
 
+  model.onchange = async () => {
+    const id = model.value;
+    describeModel(id);
+    setModelNote("");
+    model.disabled = true;
+    if (!(await client.send({ t: "model_set", model: id }))) {
+      setModelNote("Your computer is offline: try again when it's back.");
+      model.value = currentModel;
+      describeModel(currentModel);
+      model.disabled = false;
+    }
+  };
   keep.onchange = async () => {
     const days = keep.value === "forever" ? null : Number(keep.value);
     const shorter = days !== null && (client.settings.historyDays == null || days < client.settings.historyDays);
@@ -915,6 +955,22 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   };
 
   return {
+    showModel(m) {
+      models = m.choices;
+      currentModel = m.current;
+      model.replaceChildren(
+        ...m.choices.map((c) => h("option", c.ready || c.id === m.current ? { value: c.id } : { value: c.id, disabled: "" }, c.ready || c.id === m.current ? c.name : `${c.name} (not downloaded)`)),
+      );
+      model.value = m.current;
+      model.disabled = m.choices.length < 2;
+      describeModel(m.current);
+    },
+    modelNote(text) {
+      setModelNote(text);
+      model.value = currentModel;
+      describeModel(currentModel);
+      model.disabled = false;
+    },
     showHistory(days) {
       showKeep(days);
       keep.disabled = false;

@@ -88,15 +88,37 @@ async function boot(): Promise<void> {
   applyTheme(saved?.theme, saved?.appearance);
   if (location.hash.startsWith("#pair=")) return pairingScreen(store);
   const identity = await store.get<Identity>("identity");
-  if (!identity) return welcomeScreen();
+  if (!identity) return welcomeScreen(store);
   return chat(store, identity);
 }
 
-function welcomeScreen(): void {
+const onIphone = () => platform(navigator.userAgent, navigator.maxTouchPoints) === "ios";
+
+function welcomeScreen(store: Store): void {
+  // The installed app on an iPhone can't be reached by scanning: the camera opens the link in Safari, whose data
+  // is separate from the Home Screen app's. So the link can be pasted here too.
+  const link = h("input", { type: "url", placeholder: "Paste the pairing link", "aria-label": "Pairing link", autocomplete: "off" }) as HTMLInputElement;
+  const go = h("button", { class: "primary", type: "button" }, "Pair");
+  const msg = h("p", { class: "error" });
+  go.onclick = () => {
+    const at = link.value.indexOf("#pair=");
+    if (at < 0) {
+      msg.textContent = "That isn't a pairing link. It starts with the app's address and has #pair= in it.";
+      return;
+    }
+    location.hash = link.value.slice(at).trim();
+    void pairingScreen(store);
+  };
   screen(
     mark(),
     h("h1", {}, "aha! A Truly Private Personal Assistant"),
     h("p", {}, "To use Aha!, pair this device with your own computer: run ", h("code", {}, "aha pair <your name>"), " there and scan the QR code it shows."),
+    standalone() && onIphone()
+      ? h("p", {}, "In the Home Screen app, paste the link instead: point the Camera at the QR code, touch and hold the link it shows, choose Copy, and paste it here.")
+      : h("p", { class: "fine" }, "Or paste the link the QR code holds:"),
+    link,
+    go,
+    msg,
     h("p", { class: "fine" }, `Messages are end-to-end encrypted between this device and your computer. Version ${APP_VERSION} (${BUILD}).`),
   );
 }
@@ -110,8 +132,29 @@ async function pairingScreen(store: Store): Promise<void> {
     screen(mark(), h("h1", {}, "That link doesn't work"), h("p", { class: "error" }, String((e as Error).message)));
     return;
   }
+  const fullLink = location.origin + location.pathname + location.hash;
   // The secret must not stay in the address bar or the history.
   history.replaceState(null, "", location.pathname);
+  // On an iPhone, Safari and the Home Screen app keep separate data: a pairing made in Safari isn't in the app.
+  const copy = h("button", { class: "btn", type: "button" }, "Copy pairing link");
+  copy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(fullLink);
+      copy.textContent = "Copied: now open Aha! from your Home Screen and paste it";
+    } catch {
+      copy.textContent = "Couldn't copy";
+    }
+  };
+  const iphoneBox =
+    onIphone() && !standalone()
+      ? h(
+          "div",
+          { class: "note-box" },
+          h("p", {}, h("b", {}, "Using Aha! from your Home Screen?"), " Pair there, not here: on iPhone the Home Screen app keeps its own data, separate from Safari, so a pairing made in Safari isn't in it."),
+          h("p", { class: "fine" }, "Copy the link, add Aha! to your Home Screen (Share → Add to Home Screen), open it from there and paste the link."),
+          copy,
+        )
+      : "";
   const existing = await store.get<Identity>("identity");
   // A link for a different computer than the one this device is paired with (SPEC §6.4).
   const different = !!existing && (existing.fp ? existing.fp !== data.fp : existing.gw !== data.gw || existing.home !== data.home);
@@ -128,6 +171,7 @@ async function pairingScreen(store: Store): Promise<void> {
     h("h1", {}, `Hi ${data.name}`),
     h("p", {}, `This connects this device to Aha! on “${data.home}”. Everything you write is end-to-end encrypted to that computer.`),
     existing && !different ? h("p", { class: "error" }, "This device is already paired; pairing again replaces it.") : "",
+    iphoneBox,
     different
       ? h(
           "div",
@@ -171,7 +215,7 @@ function defaultName(): string {
 
 async function chat(store: Store, identity: Identity): Promise<void> {
   const state = await store.get<RatchetState>("ratchet");
-  if (!state) return welcomeScreen();
+  if (!state) return welcomeScreen(store);
   const ratchet = Ratchet.fromJSON(state);
   const settings: Settings = { ...DEFAULT_SETTINGS, ...((await store.get<Settings>("settings")) ?? {}) };
 
@@ -216,7 +260,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
-  const installHint = h("div", { class: "banner" }, "Add Aha! to your Home Screen (Share → Add to Home Screen). Otherwise Safari may delete this pairing after 7 days without a visit.");
+  const installHint = h("div", { class: "banner" }, "Safari may delete this pairing after 7 days without a visit. To keep Aha! on your Home Screen, add it (Share → Add to Home Screen) and pair it again there: it keeps its own data, so this pairing isn't in it.");
   installHint.hidden = !ios || installed;
   app.replaceChildren(
     h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, menu)),

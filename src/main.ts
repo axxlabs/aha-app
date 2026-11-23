@@ -397,6 +397,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
             ? "🔑"
             : it.kind === "schedule"
               ? "⏰"
+              : it.kind === "calendar" || it.kind === "calendar_delete"
+                ? "📅"
               : it.kind === "check"
                 ? "🧩"
                 : "✋";
@@ -977,10 +979,10 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
   // Settings → Connections (SPEC §7.4): what Aha! is connected to for this person; the address only.
   const emailText = h("small", {}, "Checking…");
-  const emailBtn = h("button", { class: "btn danger", type: "button", hidden: "" }, "Disconnect email");
+  const emailBtn = h("button", { class: "btn danger", type: "button", hidden: "" }, "Disconnect Google");
   let emailAddress = "";
   emailBtn.onclick = async () => {
-    if (!confirm(`Disconnect ${emailAddress}? Aha! won't be able to read or write your email until it's connected again.`)) return;
+    if (!confirm(`Disconnect ${emailAddress}? Aha! won't be able to use your email or calendar until it's connected again.`)) return;
     emailBtn.setAttribute("disabled", "");
     if (!(await client.send({ t: "email_disconnect" }))) {
       emailBtn.removeAttribute("disabled");
@@ -1041,7 +1043,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         "section",
         {},
         h("h4", {}, "Connections"),
-        h("div", { class: "row" }, h("span", {}, "Email (Gmail)", emailText), emailBtn),
+        h("div", { class: "row" }, h("span", {}, "Google (Gmail and Calendar)", emailText), emailBtn),
       ),
       h("section", {}, h("h4", {}, "Your devices"), devices),
       h(

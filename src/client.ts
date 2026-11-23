@@ -195,7 +195,8 @@ export function pair(data: PairData, deviceName = defaultDeviceName()): Promise<
 export interface BrowserSite {
   site: string;
   signed_in: boolean;
-  trusted: boolean; // fills in forms there without asking (SPEC §5.7)
+  trusted: boolean; // acts there without asking (SPEC §5.7)
+  login_saved?: boolean; // a login saved on a login card (SPEC §5.8)
 }
 
 /** A model the computer can run (SPEC §3.2, Settings → Model). */

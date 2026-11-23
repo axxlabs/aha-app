@@ -1032,9 +1032,9 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         "section",
         {},
         h("h4", {}, "Your browser"),
-        h("p", { class: "fine" }, "Aha!'s browser remembers sites like your own browser does, so you stay signed in. On trusted sites it fills in forms without asking you first (signing in still uses the card)."),
+        h("p", { class: "fine" }, "Aha!'s browser remembers sites like your own browser does, so you stay signed in. On trusted sites it acts without asking you first. Logins you chose to save are kept encrypted on your computer."),
         sites,
-        h("div", { class: "row" }, h("span", {}, "Trust a site", h("small", {}, "Fills in forms there without asking.")), h("span", { class: "site-actions" }, trustInput, trustBtn)),
+        h("div", { class: "row" }, h("span", {}, "Trust a site", h("small", {}, "Acts there without asking.")), h("span", { class: "site-actions" }, trustInput, trustBtn)),
         siteNote,
       ),
       h(
@@ -1169,7 +1169,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     if (e.key === "Enter") trustBtn.click();
   });
   clearBrowser.onclick = async () => {
-    if (!confirm("Clear everything Aha!'s browser remembers? You'll be signed out of every site. Trusted sites stay.")) return;
+    if (!confirm("Clear everything Aha!'s browser remembers? You'll be signed out of every site and saved logins are deleted. Trusted sites stay.")) return;
     clearBrowser.disabled = true;
     if (!(await client.send({ t: "browser_clear" }))) {
       clearBrowser.disabled = false;
@@ -1264,7 +1264,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
       emailBtn.removeAttribute("disabled");
     },
     showBrowser(list) {
-      clearBrowser.disabled = !list.some((s) => !s.trusted || s.signed_in);
+      clearBrowser.disabled = !list.some((s) => !s.trusted || s.signed_in || s.login_saved);
       clearBrowser.textContent = "Clear browser";
       trustBtn.disabled = false;
       sites.replaceChildren(
@@ -1272,11 +1272,18 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
           ? list.map((s) => {
               const forget = h("button", { class: "btn", type: "button" }, "Forget");
               forget.onclick = async () => {
-                if (!confirm(`Forget ${s.site}? You'll be signed out there.`)) return;
+                if (!confirm(`Forget ${s.site}? You'll be signed out there${s.login_saved ? " and its saved login is deleted" : ""}.`)) return;
                 forget.setAttribute("disabled", "");
                 if (!(await client.send({ t: "browser_forget", site: s.site }))) forget.removeAttribute("disabled");
               };
-              // Trusted (SPEC §5.7): Aha! fills in forms on this site without asking.
+              const forgetLogin = h("button", { class: "btn", type: "button" }, "Forget login");
+              forgetLogin.onclick = async () => {
+                if (!confirm(`Forget the saved login for ${s.site}?`)) return;
+                forgetLogin.setAttribute("disabled", "");
+                if (!(await client.send({ t: "login_forget", site: s.site }))) forgetLogin.removeAttribute("disabled");
+              };
+              const tags = [s.signed_in ? "signed in" : "", s.login_saved ? "login saved" : ""].filter(Boolean);
+              // Trusted (SPEC §5.7): Aha! acts on this site without asking.
               const trust = h("input", { type: "checkbox", "aria-label": `Trust ${s.site}` }) as HTMLInputElement;
               trust.checked = s.trusted;
               trust.onchange = async () => {
@@ -1289,8 +1296,8 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
               return h(
                 "div",
                 { class: "row" },
-                h("span", {}, s.site, ...(s.signed_in ? [h("small", {}, "signed in")] : [])),
-                h("span", { class: "site-actions" }, h("label", { class: "trust" }, trust, "Trusted"), forget),
+                h("span", {}, s.site, ...(tags.length ? [h("small", {}, tags.join(" · "))] : [])),
+                h("span", { class: "site-actions" }, h("label", { class: "trust" }, trust, "Trusted"), ...(s.login_saved ? [forgetLogin] : []), forget),
               );
             })
           : [h("p", { class: "fine" }, "Nothing yet.")]),

@@ -189,3 +189,6 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .trace-row small { color: var(--muted); font-size: 12px; }
 .trace-row summary { font-size: 13px; cursor: pointer; color: var(--muted); }
 .trace-row .report-draft { max-height: 50vh; margin-top: 4px; }
+/* Open links: the choice under its label */
+.row.col-row { flex-direction: column; align-items: stretch; }
+.row.col-row .segmented { grid-template-columns: repeat(2, 1fr); }

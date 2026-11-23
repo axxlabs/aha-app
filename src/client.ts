@@ -49,6 +49,7 @@ export interface Settings {
   notifications: boolean;
   theme: string; // a colour theme id (themes.ts)
   appearance: "auto" | "light" | "dark";
+  links?: "app" | "browser"; // where links in replies open in the installed app (links.ts); default "app"
 }
 
 export const DEFAULT_SETTINGS: Settings = { notifications: false, theme: "saffron-hour", appearance: "auto" };

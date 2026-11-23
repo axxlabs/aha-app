@@ -9,6 +9,7 @@ import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFA
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
 import { render } from "./markdown";
+import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
 
 declare const __BUILD__: string;
@@ -194,6 +195,15 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const menu = h("button", { class: "icon-btn", type: "button", "aria-label": "Settings" }, icon(ICONS.menu));
   const banner = h("div", { class: "banner", hidden: "" });
   const col = h("div", { class: "col" });
+  // A link in a reply, in the installed app with "In my browser" chosen: hand it to the phone's browser (links.ts).
+  col.addEventListener("click", (e) => {
+    const a = (e.target as Element).closest?.(".aha a[href]") as HTMLAnchorElement | null;
+    if (!a || client.settings.links !== "browser" || !standalone()) return;
+    const url = externalUrl(a.href, platform(navigator.userAgent, navigator.maxTouchPoints));
+    if (url === a.href) return;
+    e.preventDefault();
+    location.href = url;
+  });
   const scroller = h("main", { class: "chat" }, col);
   const working = h("div", { class: "working", hidden: "", role: "status" }, h("i"), h("i"), h("i"), " Aha! is working…");
   const input = h("textarea", { rows: "1", placeholder: "Ask Aha! anything", "aria-label": "Message", enterkeyhint: "enter", maxlength: "20000" }) as HTMLTextAreaElement;
@@ -892,6 +902,17 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   };
   note(client.computer ? "" : "Your computer is offline: these need it online.");
   const notify = h("button", { class: "btn", type: "button" }, client.settings.notifications ? "On" : "Turn on");
+  // Open links (links.ts): only the installed app on a phone can choose.
+  const linkModes = h("div", { class: "segmented", role: "radiogroup", "aria-label": "Open links" });
+  for (const [id, name] of [["app", "In the app"], ["browser", "In my browser"]] as const) {
+    const b = h("button", { type: "button", role: "radio", "aria-checked": String(id === (client.settings.links ?? "app")) }, name);
+    b.onclick = async () => {
+      for (const o of linkModes.children) o.setAttribute("aria-checked", String(o === b));
+      client.settings = { ...client.settings, links: id };
+      await store.put("settings", client.settings);
+    };
+    linkModes.append(b);
+  }
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
   const reportBtn = h("button", { class: "btn", type: "button" }, "Report");
   const modes = h("div", { class: "segmented", role: "radiogroup", "aria-label": "Appearance" });
@@ -959,6 +980,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         {},
         h("h4", {}, "This device"),
         h("div", { class: "row" }, h("span", {}, "Notifications", h("small", {}, "They only say “New message from Aha!”.")), notify),
+        h("div", { class: "row col-row" }, h("span", {}, "Open links", h("small", {}, "In the installed app on a phone: over the app, or in your phone's browser.")), linkModes),
         h("div", { class: "row" }, h("span", {}, "Unpair this device", h("small", {}, "Deletes its keys and cached messages.")), unpair),
       ),
       h("section", {}, h("h4", {}, "Appearance"), modes),

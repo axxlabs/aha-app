@@ -602,6 +602,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     devices(list) {
       settingsUi?.showDevices(list);
     },
+    connections(email) {
+      settingsUi?.showConnections(email);
+    },
     browser(list) {
       settingsUi?.showBrowser(list);
     },
@@ -831,6 +834,7 @@ interface SettingsUi {
   showMemories(list: { id: string; text: string }[]): void;
   showDevices(list: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   showBrowser(list: BrowserSite[]): void;
+  showConnections(email: string): void;
   showModel(m: { current: string; choices: ModelChoice[] }): void;
   modelNote(text: string): void;
   browserNote(text: string): void;
@@ -968,6 +972,18 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     linkModes.append(b);
   }
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
+  // Settings → Connections (SPEC §7.4): what Aha! is connected to for this person; the address only.
+  const emailText = h("small", {}, "Checking…");
+  const emailBtn = h("button", { class: "btn danger", type: "button", hidden: "" }, "Disconnect email");
+  let emailAddress = "";
+  emailBtn.onclick = async () => {
+    if (!confirm(`Disconnect ${emailAddress}? Aha! won't be able to read or write your email until it's connected again.`)) return;
+    emailBtn.setAttribute("disabled", "");
+    if (!(await client.send({ t: "email_disconnect" }))) {
+      emailBtn.removeAttribute("disabled");
+      alert("Your computer is offline: try again when it's back.");
+    }
+  };
   const reportBtn = h("button", { class: "btn", type: "button" }, "Report");
   const modes = h("div", { class: "segmented", role: "radiogroup", "aria-label": "Appearance" });
   for (const m of APPEARANCES) {
@@ -1017,6 +1033,12 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         sites,
         h("div", { class: "row" }, h("span", {}, "Trust a site", h("small", {}, "Fills in forms there without asking.")), h("span", { class: "site-actions" }, trustInput, trustBtn)),
         siteNote,
+      ),
+      h(
+        "section",
+        {},
+        h("h4", {}, "Connections"),
+        h("div", { class: "row" }, h("span", {}, "Email (Gmail)", emailText), emailBtn),
       ),
       h("section", {}, h("h4", {}, "Your devices"), devices),
       h(
@@ -1089,6 +1111,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   void client.send({ t: "history_settings_request" });
   void client.send({ t: "devices_request" });
   void client.send({ t: "browser_request" });
+  void client.send({ t: "connections_request" });
   void client.send({ t: "model_request" });
 
   model.onchange = async () => {
@@ -1230,6 +1253,12 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
     browserNote(text) {
       siteNote.textContent = text;
       siteNote.hidden = !text;
+    },
+    showConnections(email) {
+      emailAddress = email;
+      emailText.textContent = email || `Not connected. To connect, run \`aha mail connect ${client.identity.name}\` on your computer.`;
+      emailBtn.hidden = !email;
+      emailBtn.removeAttribute("disabled");
     },
     showBrowser(list) {
       clearBrowser.disabled = !list.some((s) => !s.trusted || s.signed_in);

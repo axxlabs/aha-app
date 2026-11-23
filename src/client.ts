@@ -253,6 +253,7 @@ export interface Events {
   memories(items: { id: string; text: string }[]): void;
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   browser(sites: BrowserSite[]): void;
+  connections(email: string): void;
   model(m: { current: string; choices: ModelChoice[] }): void;
   trace(seq: number, events: TraceEvent[]): void;
   error(code: string): void;
@@ -426,6 +427,9 @@ export class Client {
         break;
       case "browser":
         this.on.browser(browserSites(msg.sites));
+        break;
+      case "connections":
+        this.on.connections(typeof msg.email === "string" ? msg.email : "");
         break;
       case "model":
         this.on.model(modelChoices(msg));

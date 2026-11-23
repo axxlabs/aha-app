@@ -605,11 +605,17 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 
   // composer
   const grow = () => {
+    // scrollHeight leaves out the border, so the box was 2px short and always scrollable: count it in, and only
+    // let the box scroll once it's at its tallest.
     input.style.height = "auto";
-    input.style.height = `${Math.min(input.scrollHeight, window.innerHeight * 0.4)}px`;
+    const full = input.scrollHeight + input.offsetHeight - input.clientHeight;
+    const max = window.innerHeight * 0.4;
+    input.style.height = `${Math.min(full, max)}px`;
+    input.style.overflowY = full > max ? "auto" : "hidden";
     setBusy(busy);
   };
   input.addEventListener("input", grow);
+  requestAnimationFrame(grow);
   function setPhoto(p: Photo | null): void {
     photo = p;
     attachment.replaceChildren();

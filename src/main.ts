@@ -8,6 +8,7 @@ import { APPEARANCES, THEMES, applyTheme } from "./themes";
 import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type ModelChoice, type TraceEvent, traceTime, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
+import { foldLabel, plan } from "./fold";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
@@ -358,6 +359,62 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (after) col.insertBefore(el, after);
     else col.append(el);
     col.append(working);
+    queueRefold();
+  }
+
+  // Folding after a break (SPEC §7.4 "Folding"): earlier parts become one grey line each; what's unfinished
+  // stays open; the part still going on stays as it is.
+  const expanded = new Set<number>();
+  let refoldQueued = false;
+  function refold(): void {
+    refoldQueued = false;
+    const all = [...items.values()];
+    const resolved = new Set(all.filter((it) => it.t === "approval_state").map((it) => String(it.id)));
+    const now = Date.now() / 1000;
+    const parts = plan(all, resolved, now, busy);
+    const bySeq = new Map([...col.querySelectorAll<HTMLElement>("[data-seq]")].map((el) => [Number(el.dataset.seq), el]));
+    const lines = new Set<HTMLElement>();
+    for (const p of parts) {
+      let line = col.querySelector<HTMLButtonElement>(`.fold[data-fold="${p.first}"]`);
+      const els = [...bySeq].filter(([seq]) => seq >= p.first && seq <= p.last).map(([seq, el]) => ({ seq, el }));
+      if (!p.folded) {
+        for (const { el } of els) el.hidden = false;
+        continue;
+      }
+      const open = expanded.has(p.first);
+      if (!line) {
+        line = h("button", { class: "fold", type: "button" }) as HTMLButtonElement;
+        line.dataset.fold = String(p.first);
+        const first = p.first;
+        line.onclick = () => {
+          if (expanded.has(first)) expanded.delete(first);
+          else expanded.add(first);
+          refold();
+        };
+      }
+      const at = els[0]?.el;
+      if (at && line.nextElementSibling !== at) col.insertBefore(line, at);
+      line.replaceChildren(h("span", { class: "chevron", "aria-hidden": "true" }, open ? "▾" : "▸"), foldLabel(p, now));
+      line.setAttribute("aria-expanded", String(open));
+      lines.add(line);
+      for (const { seq, el } of els) el.hidden = !open && !p.open.has(seq);
+    }
+    for (const old of col.querySelectorAll<HTMLElement>(".fold")) if (!lines.has(old)) old.remove();
+    // A day's label shows only above a message or card that shows (a fold line carries its own date).
+    for (const day of col.querySelectorAll<HTMLElement>(".day")) {
+      let next = day.nextElementSibling as HTMLElement | null;
+      let visible = false;
+      while (next && !next.classList.contains("day") && !visible) {
+        visible = !!next.dataset.seq && !next.hidden;
+        next = next.nextElementSibling as HTMLElement | null;
+      }
+      day.hidden = !visible;
+    }
+  }
+  function queueRefold(): void {
+    if (refoldQueued) return;
+    refoldQueued = true;
+    requestAnimationFrame(refold);
   }
 
   /** History before `start` was deleted: redraw the chat without it. */
@@ -536,6 +593,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const label: Record<string, string> = { approved: "✓ Approved", declined: "Declined", expired: "Expired", stopped: "Stopped", replaced: "Replaced by an edited version" };
     const el = c.el.querySelector(".state");
     if (el) el.textContent = label[st] ?? st;
+    queueRefold();
   }
 
   function setStatus(connected: boolean, computer: boolean): void {
@@ -551,6 +609,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   let lastSend = 0;
   const stopMode = () => busy && !input.value.trim() && !photo && Date.now() - lastSend >= STOP_GRACE;
   function setBusy(on: boolean): void {
+    if (on !== busy) queueRefold();
     busy = on;
     working.toggleAttribute("hidden", !on);
     const stop = stopMode();
@@ -640,6 +699,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   await store.prune(Math.floor(Date.now() / 1000) - cacheDays(settings) * 86400, (it) => it.t === "approval");
   const cached = await store.items();
   for (const it of cached) place(it, "end");
+  refold();
   // a pending approval's card stays usable only if no state was recorded for it
   for (const m of await store.outbox()) showPending(m.cid, m.text, false, m.image);
   toBottom();
@@ -721,6 +781,13 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (settingsUi) return settingsUi.close(); // the menu button toggles the side pane
     settingsUi = openSettings(store, client, () => (settingsUi = null));
   };
+
+  // A break can happen while the app is open in the background: fold when it's looked at again.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    refold();
+    toBottom();
+  });
 
   // keep the cache window: prune every hour while open
   setInterval(() => {

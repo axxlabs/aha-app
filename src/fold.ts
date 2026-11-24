@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Axxlabs Limited
+// Folding the chat after a break (SPEC §7.4 "Folding"). The same rule as the computer's aha_local/folding.py:
+// a break is two hours without a message, or a new day. Each part before a break folds into one grey line with
+// its title; what's unfinished stays open; the part still going on doesn't fold and has no title.
+import type { Item } from "./store";
+
+export const BREAK_SECONDS = 2 * 3600;
+
+export interface Part {
+  first: number; // seq of its first item
+  last: number;
+  ts: number; // when it started
+  title: string;
+  folded: boolean; // false for the part still going on
+  open: Set<number>; // seqs that stay visible while it's folded
+}
+
+const shown = (it: Item) => it.t === "msg" || it.t === "approval";
+const sameDay = (a: number, b: number) => new Date(a * 1000).toDateString() === new Date(b * 1000).toDateString();
+export const isBreak = (before: number, after: number) => after - before >= BREAK_SECONDS || !sameDay(before, after);
+
+/** The first words of the person's first message: the title when the computer didn't give one. */
+function firstWords(items: Item[]): string {
+  const mine = items.find((it) => it.t === "msg" && it.role === "me" && String(it.text ?? "").trim());
+  const words = String(mine?.text ?? "").trim().split(/\s+/);
+  if (!words[0]) return "Earlier";
+  return words.length > 7 ? `${words.slice(0, 7).join(" ").replace(/[,.;:!?]+$/, "")}…` : words.join(" ");
+}
+
+/** The parts of the chat and what shows of each. `resolved`: the approval ids that have a state; `working`: a
+ * task is running now. */
+export function plan(all: Item[], resolved: Set<string>, now: number, working = false): Part[] {
+  const items = [...all].sort((a, b) => a.seq - b.seq);
+  const chat = items.filter(shown);
+  const titles = items.filter((it) => it.t === "title");
+  const lastMine = Math.max(0, ...chat.filter((it) => it.role === "me").map((it) => it.seq));
+  const parts: Item[][] = [];
+  for (const it of chat) {
+    const cur = parts[parts.length - 1];
+    if (!cur || isBreak(cur[cur.length - 1].ts, it.ts)) parts.push([it]);
+    else cur.push(it);
+  }
+  return parts.map((part, i) => {
+    const first = part[0].seq;
+    const last = part[part.length - 1].seq;
+    // The last part is still going on until a break, or while Aha! works on it.
+    const live = i === parts.length - 1 && (working || !isBreak(part[part.length - 1].ts, now));
+    const named = titles.filter((t) => Number(t.from) >= first && Number(t.from) <= last).pop();
+    const open = new Set<number>();
+    part.forEach((it, k) => {
+      const unfinished =
+        (it.t === "approval" && !resolved.has(String(it.id))) || // a card waiting for you
+        (it.t === "msg" && it.open === "stopped" && it.seq > lastMine) || // stopped, and you haven't written since
+        (it.t === "msg" && it.open === "asks" && it.seq > lastMine); // a question you haven't answered
+      if (!unfinished) return;
+      open.add(it.seq);
+      const before = part[k - 1]; // what you asked, so the open item makes sense on its own
+      if (before?.t === "msg" && before.role === "me") open.add(before.seq);
+    });
+    return { first, last, ts: part[0].ts, title: String(named?.text ?? "") || firstWords(part), folded: !live, open };
+  });
+}
+
+export function foldLabel(p: Part, now: number): string {
+  const d = new Date(p.ts * 1000);
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const day = sameDay(p.ts, now) ? "today" : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  return `${p.title} · ${day} ${time}`;
+}

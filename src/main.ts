@@ -542,8 +542,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const client = new Client(store, identity, ratchet, settings, {
     item(it, live) {
       view.add([it]);
-      // A reply, or a card waiting for you: Aha! isn't working on its own any more (SPEC §3.3).
-      if (live && ((it.t === "msg" && it.role === "aha") || it.t === "approval")) setBusy(false);
+      // "Working" comes only from the computer (typing frames and the sync): no guessing from what arrives,
+      // which turned it off at every message a task sends while it carries on (SPEC §3.3).
       if (live) view.invalidate(true);
     },
     typing(on, queued) {

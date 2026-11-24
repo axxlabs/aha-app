@@ -398,6 +398,7 @@ export class Client {
       case "msg":
       case "approval":
       case "approval_state":
+      case "title": // names a part of the chat, or starts one at a new subject (SPEC §7.4 "Folding")
         await this.accept([msg as unknown as Item], true);
         break;
       case "typing":

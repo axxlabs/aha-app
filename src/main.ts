@@ -380,6 +380,19 @@ async function chat(store: Store, identity: Identity): Promise<void> {
                 ? "🧩"
                 : "✋";
     const card = h("article", { class: "card" }, h("h3", {}, `${icon} ${String(it.title)}`));
+    // Why this card is shown, as the computer's code decided it (SPEC §5.2, §7.4): a tooltip on hover, and a tap
+    // shows it in the card (phones have no hover).
+    const why = typeof it.why === "string" ? it.why.trim() : "";
+    if (why) {
+      const note = h("p", { class: "why", hidden: "" }, why);
+      const info = h("button", { class: "info", type: "button", title: why, "aria-label": "Why am I asked?", "aria-expanded": "false" }, "i");
+      info.onclick = () => {
+        note.hidden = !note.hidden;
+        info.setAttribute("aria-expanded", String(!note.hidden));
+      };
+      card.classList.add("has-why");
+      card.append(info, note);
+    }
     const img = it.image as { mime?: string; b64?: string } | undefined;
     const shot = img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "") ? (h("img", { alt: "Screenshot of the page", src: `data:${img.mime};base64,${img.b64}` }) as HTMLImageElement) : null;
     // A check card (SPEC §3.4, §5.3): the person taps the screenshot where they'd click.

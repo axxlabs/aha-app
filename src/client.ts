@@ -5,6 +5,7 @@
 // the end-to-end ratchet with the computer, the outbox and sync. The gateway only ever sees ciphertext.
 
 import * as c from "./crypto";
+import type { DateFormat } from "./markdown";
 import type { Item, Photo, Store } from "./store";
 
 // SPEC §10.2: "hot-staging" for now, named by the build's commit; an incremental release number once releases start.
@@ -57,6 +58,7 @@ export interface Settings {
   theme: string; // a colour theme id (themes.ts)
   appearance: "auto" | "light" | "dark";
   links?: "app" | "browser"; // where links in replies open in the installed app (links.ts); default "app"
+  dates?: DateFormat; // how date labels read (markdown.ts); default "short": "Wed, 2 of Dec"
 }
 
 export const DEFAULT_SETTINGS: Settings = { notifications: false, theme: "saffron-hour", appearance: "auto" };

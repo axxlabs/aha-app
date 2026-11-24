@@ -56,6 +56,9 @@ a { color: inherit; text-underline-offset: 3px; }
 /* The person's own account: in the accent colour, set apart from other people's addresses. */
 .label.mine { background: var(--accent-soft); border-color: var(--accent); }
 .label.mine::before { color: var(--ink); }
+.label.date { background: var(--soft); border-color: var(--line); font-weight: 600; white-space: nowrap; }
+.label.date::before { content: "📅"; font-size: .85em; }
+.segmented.wrap { flex-wrap: wrap; }
 .aha p { margin: 0 0 .6em; } .aha p:last-child { margin-bottom: 0; }
 .aha ul, .aha ol { margin: .2em 0 .6em; padding-left: 1.3em; }
 .aha code { background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: .92em; }

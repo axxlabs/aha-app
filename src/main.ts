@@ -9,7 +9,7 @@ import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFA
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
 import { chatView } from "./view";
-import { render } from "./markdown";
+import { DATE_FORMATS, formatDate, render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
 
@@ -304,6 +304,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     accounts = list;
     view.remake((it) => it.t === "msg" && it.role === "aha"); // drawn again with the labels
   }
+  window.addEventListener("aha-dates", () => view.remake((it) => it.t === "msg" && it.role === "aha"));
 
   function node(it: Item): HTMLElement | null {
     if (it.t === "msg" && it.role === "me") {
@@ -314,7 +315,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     }
     if (it.t === "msg") {
       const el = h("div", { class: "aha" });
-      el.innerHTML = render(String(it.text ?? ""), accounts); // markdown-it, html disabled; accounts as labels
+      el.innerHTML = render(String(it.text ?? ""), accounts, client.settings.dates); // html disabled; labels
       const img = it.image as { mime?: string; b64?: string } | undefined;
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
       el.append(messageMenu(it.seq));
@@ -992,6 +993,19 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   const notify = h("button", { class: "btn", type: "button" }, client.settings.notifications ? "On" : "Turn on");
   // Open links (links.ts): only the installed app on a phone can choose.
   const linkModes = h("div", { class: "segmented", role: "radiogroup", "aria-label": "Open links" });
+  // Dates (SPEC §7.4 "Labels"): how the date labels in replies read, on this device.
+  const dateModes = h("div", { class: "segmented wrap", role: "radiogroup", "aria-label": "Dates" });
+  for (const [id] of DATE_FORMATS) {
+    const sample = formatDate(new Date(), id);
+    const b = h("button", { type: "button", role: "radio", "aria-checked": String(id === (client.settings.dates ?? "short")) }, sample);
+    b.onclick = async () => {
+      for (const o of dateModes.children) o.setAttribute("aria-checked", String(o === b));
+      client.settings = { ...client.settings, dates: id };
+      await store.put("settings", client.settings);
+      window.dispatchEvent(new Event("aha-dates")); // the chat draws its replies again
+    };
+    dateModes.append(b);
+  }
   for (const [id, name] of [["app", "In the app"], ["browser", "In my browser"]] as const) {
     const b = h("button", { type: "button", role: "radio", "aria-checked": String(id === (client.settings.links ?? "app")) }, name);
     b.onclick = async () => {
@@ -1083,6 +1097,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         h("h4", {}, "This device"),
         h("div", { class: "row" }, h("span", {}, "Notifications", h("small", {}, "They only say “New message from Aha!”.")), notify),
         h("div", { class: "row col-row" }, h("span", {}, "Open links", h("small", {}, "In the installed app on a phone: over the app, or in your phone's browser.")), linkModes),
+        h("div", { class: "row col-row" }, h("span", {}, "Dates", h("small", {}, "How dates in replies read, on this device.")), dateModes),
         h("div", { class: "row" }, h("span", {}, "Unpair this device", h("small", {}, "Deletes its keys and cached messages.")), unpair),
       ),
       h("section", {}, h("h4", {}, "Appearance"), modes),

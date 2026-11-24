@@ -71,7 +71,91 @@ md.core.ruler.push("email_labels", (state) => {
   }
 });
 
-/** A reply as safe HTML; `accounts`: the person's connected addresses, tagged in their own colour. */
-export function render(text: string, accounts: string[] = []): string {
-  return md.render(text, { accounts });
+// Date labels (SPEC §7.4 "Labels"): Aha! writes every date as a full date, DD/MM/YYYY, never a weekday (it guesses
+// weekdays wrong). Each one shows here as a 📅 label, its weekday worked out by the app, in the person's format.
+export type DateFormat = "short" | "day" | "long" | "plain" | "numeric";
+export const DATE_FORMATS: [DateFormat, string][] = [
+  ["short", "Wed, 2 of Dec"],
+  ["day", "Wed 2 Dec"],
+  ["long", "Wednesday 2 December"],
+  ["plain", "2 Dec 2026"],
+  ["numeric", "02/12/2026"],
+];
+// DD/MM/YYYY, and YYYY-MM-DD as the computer's tools write dates (the model may copy one).
+const DATE = /\b(?:(\d{1,2})\/(\d{1,2})\/(\d{4})|(\d{4})-(\d{2})-(\d{2}))\b/g;
+const WD = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** A date as the person likes it; the year only when it isn't this year (always in "plain" and "numeric"). */
+export function formatDate(d: Date, format: DateFormat = "short", now = new Date()): string {
+  const wd = WD[d.getDay()], mon = MON[d.getMonth()], day = d.getDate(), year = d.getFullYear();
+  const other = year !== now.getFullYear() ? ` ${year}` : "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  switch (format) {
+    case "day":
+      return `${wd.slice(0, 3)} ${day} ${mon.slice(0, 3)}${other}`;
+    case "long":
+      return `${wd} ${day} ${mon}${other}`;
+    case "plain":
+      return `${day} ${mon.slice(0, 3)} ${year}`;
+    case "numeric":
+      return `${pad(day)}/${pad(d.getMonth() + 1)}/${year}`;
+    default:
+      return `${wd.slice(0, 3)}, ${day} of ${mon.slice(0, 3)}${other}`;
+  }
+}
+
+/** DD/MM/YYYY as a date, or null if there's no such day (31/02/2026). */
+export function parseDate(day: string, month: string, year: string): Date | null {
+  const d = new Date(Number(year), Number(month) - 1, Number(day));
+  return d.getDate() === Number(day) && d.getMonth() === Number(month) - 1 ? d : null;
+}
+
+md.renderer.rules.date_label = (tokens, idx) => {
+  const { date: d, format } = tokens[idx].meta as { date: Date; format: DateFormat };
+  const full = `${WD[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`;
+  return `<span class="label date" title="${full}">${escape(formatDate(d, format))}</span>`;
+};
+md.core.ruler.push("date_labels", (state) => {
+  const format: DateFormat = (state.env as { dateFormat?: DateFormat })?.dateFormat ?? "short";
+  for (const block of state.tokens) {
+    if (block.type !== "inline" || !block.children) continue;
+    const out: typeof block.children = [];
+    for (const t of block.children) {
+      if (t.type !== "text" || !/\d{4}/.test(t.content)) {
+        out.push(t);
+        continue;
+      }
+      let last = 0;
+      for (const m of t.content.matchAll(DATE)) {
+        const d = m[1] ? parseDate(m[1], m[2], m[3]) : parseDate(m[6], m[5], m[4]);
+        if (!d) continue;
+        if (m.index > last) {
+          const tok = new state.Token("text", "", 0);
+          tok.content = t.content.slice(last, m.index);
+          out.push(tok);
+        }
+        const tok = new state.Token("date_label", "", 0);
+        tok.meta = { date: d, format };
+        out.push(tok);
+        last = m.index + m[0].length;
+      }
+      if (last === 0) {
+        out.push(t);
+        continue;
+      }
+      if (last < t.content.length) {
+        const tok = new state.Token("text", "", 0);
+        tok.content = t.content.slice(last);
+        out.push(tok);
+      }
+    }
+    block.children = out;
+  }
+});
+
+/** A reply as safe HTML; `accounts`: the person's connected addresses, tagged in their own colour; dates as
+ * labels in `dateFormat`. */
+export function render(text: string, accounts: string[] = [], dateFormat: DateFormat = "short"): string {
+  return md.render(text, { accounts, dateFormat });
 }

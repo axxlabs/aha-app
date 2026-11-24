@@ -674,6 +674,33 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       form.requestSubmit();
     }
   });
+  // Typing or pasting anywhere goes to the message box (SPEC §7.4), unless something else that takes text has the
+  // focus (a card's fields, Settings, a dialog).
+  const takesText = (el: Element | null) =>
+    !!el && (el.matches("input, textarea, select, [contenteditable=''], [contenteditable='true']") || !!el.closest("dialog[open]"));
+  document.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key.length !== 1 || takesText(document.activeElement) || document.querySelector("dialog[open]")) return;
+    input.focus(); // the key lands in the box: focus moves before the browser inserts it
+  });
+  document.addEventListener("paste", (e) => {
+    if (takesText(document.activeElement) || document.querySelector("dialog[open]")) return;
+    const data = e.clipboardData;
+    if (!data) return;
+    const file = [...data.files].find((f) => f.type.startsWith("image/"));
+    e.preventDefault();
+    input.focus();
+    if (file) {
+      void shrinkPhoto(file).then(setPhoto, () => alert("That photo couldn't be used. Try another one, or a screenshot of it."));
+      return;
+    }
+    const text = data.getData("text/plain");
+    if (!text) return;
+    const at = input.selectionStart ?? input.value.length;
+    input.setRangeText(text, at, input.selectionEnd ?? at, "end");
+    input.dispatchEvent(new Event("input")); // grows the box, and turns Stop back into Send
+  });
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();

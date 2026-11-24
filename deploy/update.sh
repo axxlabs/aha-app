@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Axxlabs Limited
 # Build and publish the app from the public repo's main branch (SPEC §7.4). Run by a systemd timer every
-# 5 minutes; does nothing when main hasn't moved. `--force` rebuilds the current commit.
+# 30 seconds; does nothing when main hasn't moved. `--force` rebuilds the current commit.
 # The build runs in a throwaway container as this user; a release only goes live if the tests pass.
 set -euo pipefail
 SRC="${AHA_APP_SRC:-/opt/aha-app/src}"

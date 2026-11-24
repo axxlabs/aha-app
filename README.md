@@ -5,7 +5,7 @@ The **Aha!** app: one private conversation with **aha! A Truly Private Personal 
 screen); store versions come later.
 
 **Live at <https://app.aha.axxlabs.ai>**, on a server of its own (separate from the gateway's) that builds
-this repo's `main` itself: `deploy/update.sh` checks every 5 minutes, builds a new commit in a throwaway
+this repo's `main` itself: `deploy/update.sh` checks every 30 seconds, builds a new commit in a throwaway
 container after the tests pass, and switches to it atomically. The commit and the SHA-256 of every file served
 are at <https://app.aha.axxlabs.ai/release.txt>, so you can check the live app against a build of this source.
 `deploy/hetzner/create.sh` sets the server up.

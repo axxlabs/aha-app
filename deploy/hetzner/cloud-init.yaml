@@ -41,10 +41,11 @@ write_files:
   - path: /etc/systemd/system/aha-app-update.timer
     content: |
       [Unit]
-      Description=Check aha-app's main branch every 5 minutes
+      Description=Check aha-app's main branch every 30 seconds
       [Timer]
       OnBootSec=1min
-      OnUnitActiveSec=5min
+      OnUnitActiveSec=30s
+      AccuracySec=1s
       [Install]
       WantedBy=timers.target
 runcmd:

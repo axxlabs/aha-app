@@ -8,7 +8,7 @@ import { APPEARANCES, THEMES, applyTheme } from "./themes";
 import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type ModelChoice, type TraceEvent, traceTime, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
-import { foldLabel, plan } from "./fold";
+import { chatView } from "./view";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
@@ -272,16 +272,20 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     h("footer", { class: "composer" }, attachment, form),
   );
 
-  const items = new Map<number, Item>();
   const cards = new Map<string, { el: HTMLElement; resolved: boolean }>();
-  const pending = new Map<string, HTMLElement>();
   let busy = false;
-  let lastDay = "";
-  let oldest = Infinity;
   let historyStart = 1; // the first message the computer still holds (SPEC §3.8.1)
-
-  const atBottom = () => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
-  const toBottom = () => (scroller.scrollTop = scroller.scrollHeight);
+  // The chat view (src/view.ts): the items are its only state, and it draws everything from them.
+  const view = chatView({
+    col,
+    scroller,
+    working,
+    node,
+    resolve: (it, st) => applyState(String(it.id), st),
+    dayLabel,
+    busy: () => busy,
+  });
+  const toBottom = view.toBottom;
 
   function dayLabel(ts: number): string {
     return new Date(ts * 1000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
@@ -294,14 +298,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   function relabel(list: string[]): void {
     if (list.join() === accounts.join()) return;
     accounts = list;
-    for (const old of col.querySelectorAll<HTMLElement>(".aha[data-seq]")) {
-      const it = items.get(Number(old.dataset.seq));
-      const el = it && node(it);
-      if (!el) continue;
-      el.dataset.seq = old.dataset.seq;
-      el.hidden = old.hidden;
-      old.replaceWith(el);
-    }
+    view.remake((it) => it.t === "msg" && it.role === "aha"); // drawn again with the labels
   }
 
   function node(it: Item): HTMLElement | null {
@@ -346,108 +343,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     };
     const wrap = h("div", { class: "more-wrap" }, more, pop);
     return wrap;
-  }
-
-  function place(it: Item, where: "end" | "start"): void {
-    if (items.has(it.seq)) return;
-    items.set(it.seq, it);
-    oldest = Math.min(oldest, it.seq);
-    if (it.t === "approval_state") return applyState(String(it.id), String(it.state));
-    if (it.t === "msg" && it.role === "me" && typeof it.cid === "string" && pending.has(it.cid)) {
-      pending.get(it.cid)?.remove();
-      pending.delete(it.cid);
-    }
-    const el = node(it);
-    if (!el) {
-      if (it.t === "title") queueRefold(); // a title can start a new part: the one before folds now (SPEC §7.4)
-      return;
-    }
-    el.dataset.seq = String(it.seq);
-    if (where === "start") {
-      col.insertBefore(el, col.querySelector("[data-seq]"));
-      return;
-    }
-    const day = dayLabel(it.ts);
-    if (day !== lastDay) {
-      col.append(h("div", { class: "day" }, day));
-      lastDay = day;
-    }
-    // keep sequence order even if items arrive out of order
-    const after = [...col.querySelectorAll<HTMLElement>("[data-seq]")].find((x) => Number(x.dataset.seq) > it.seq);
-    if (after) col.insertBefore(el, after);
-    else col.append(el);
-    col.append(working);
-    queueRefold();
-  }
-
-  // Folding after a break (SPEC §7.4 "Folding"): earlier parts become one grey line each; what's unfinished
-  // stays open; the part still going on stays as it is.
-  const expanded = new Set<number>();
-  let refoldQueued = false;
-  function refold(): void {
-    refoldQueued = false;
-    const all = [...items.values()];
-    const resolved = new Set(all.filter((it) => it.t === "approval_state").map((it) => String(it.id)));
-    const now = Date.now() / 1000;
-    const parts = plan(all, resolved, now, busy);
-    const bySeq = new Map([...col.querySelectorAll<HTMLElement>("[data-seq]")].map((el) => [Number(el.dataset.seq), el]));
-    const lines = new Set<HTMLElement>();
-    for (const p of parts) {
-      let line = col.querySelector<HTMLButtonElement>(`.fold[data-fold="${p.first}"]`);
-      const els = [...bySeq].filter(([seq]) => seq >= p.first && seq <= p.last).map(([seq, el]) => ({ seq, el }));
-      if (!p.folded) {
-        for (const { el } of els) el.hidden = false;
-        continue;
-      }
-      const open = expanded.has(p.first);
-      if (!line) {
-        line = h("button", { class: "fold", type: "button" }) as HTMLButtonElement;
-        line.dataset.fold = String(p.first);
-        const first = p.first;
-        line.onclick = () => {
-          if (expanded.has(first)) expanded.delete(first);
-          else expanded.add(first);
-          refold();
-        };
-      }
-      const at = els[0]?.el;
-      if (at && line.nextElementSibling !== at) col.insertBefore(line, at);
-      line.replaceChildren(h("span", { class: "chevron", "aria-hidden": "true" }, open ? "▾" : "▸"), foldLabel(p, now));
-      line.setAttribute("aria-expanded", String(open));
-      lines.add(line);
-      for (const { seq, el } of els) el.hidden = !open && !p.open.has(seq);
-    }
-    for (const old of col.querySelectorAll<HTMLElement>(".fold")) if (!lines.has(old)) old.remove();
-    // A day's label shows only above a message or card that shows (a fold line carries its own date).
-    for (const day of col.querySelectorAll<HTMLElement>(".day")) {
-      let next = day.nextElementSibling as HTMLElement | null;
-      let visible = false;
-      while (next && !next.classList.contains("day") && !visible) {
-        visible = !!next.dataset.seq && !next.hidden;
-        next = next.nextElementSibling as HTMLElement | null;
-      }
-      day.hidden = !visible;
-    }
-  }
-  function queueRefold(): void {
-    if (refoldQueued) return;
-    refoldQueued = true;
-    requestAnimationFrame(refold);
-  }
-
-  /** History before `start` was deleted: redraw the chat without it. */
-  function dropBefore(start: number): void {
-    historyStart = Math.max(historyStart, start);
-    const keep = [...items.values()].filter((it) => it.seq >= start).sort((a, b) => a.seq - b.seq);
-    if (keep.length === items.size) return;
-    items.clear();
-    cards.clear();
-    lastDay = "";
-    oldest = Infinity;
-    for (const el of col.querySelectorAll("[data-seq], .day, .fold")) el.remove(); // the fold lines too
-    expanded.clear();
-    for (const it of keep) place(it, "end");
-    refold();
   }
 
   function approvalCard(it: Item): HTMLElement {
@@ -603,7 +498,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 
   function applyState(id: string, st: string): void {
     const c = cards.get(id);
-    if (!c) return;
+    if (!c || c.resolved) return;
     c.resolved = true;
     for (const b of c.el.querySelectorAll("button")) b.setAttribute("disabled", "");
     for (const i of c.el.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")) {
@@ -613,7 +508,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const label: Record<string, string> = { approved: "✓ Approved", declined: "Declined", expired: "Expired", stopped: "Stopped", replaced: "Replaced by an edited version" };
     const el = c.el.querySelector(".state");
     if (el) el.textContent = label[st] ?? st;
-    queueRefold();
   }
 
   function setStatus(connected: boolean, computer: boolean): void {
@@ -629,31 +523,28 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   let lastSend = 0;
   const stopMode = () => busy && !input.value.trim() && !photo && Date.now() - lastSend >= STOP_GRACE;
   function setBusy(on: boolean): void {
-    if (on !== busy) queueRefold();
+    if (on !== busy) view.invalidate(); // while Aha! works, the part going on doesn't fold
     busy = on;
     working.toggleAttribute("hidden", !on);
     const stop = stopMode();
     sendBtn.classList.toggle("stop", stop);
     sendBtn.replaceChildren(icon(stop ? ICONS.stop : ICONS.send));
     sendBtn.setAttribute("aria-label", stop ? "Stop" : "Send");
-    if (on && atBottom()) toBottom();
+    if (on && view.atBottom()) toBottom();
   }
 
   function showPending(cid: string, text: string, sent: boolean, image?: Photo): void {
     const el = h("div", { class: "me pending" }, text, h("span", { class: "note" }, sent ? "Sending…" : "Waiting for your computer"));
     if (image) el.prepend(h("img", { class: "photo", alt: "Your photo", src: `data:${image.mime};base64,${image.b64}` }));
-    pending.set(cid, el);
-    col.append(el, working);
-    toBottom();
+    view.sending(cid, el);
   }
 
   const client = new Client(store, identity, ratchet, settings, {
     item(it, live) {
-      const stick = atBottom();
-      place(it, "end");
+      view.add([it]);
       // A reply, or a card waiting for you: Aha! isn't working on its own any more (SPEC §3.3).
       if (live && ((it.t === "msg" && it.role === "aha") || it.t === "approval")) setBusy(false);
-      if (stick || live) toBottom();
+      if (live) view.invalidate(true);
     },
     typing(on, queued) {
       // The model answers one request at a time for the household (SPEC §3.3): say when it's someone else's turn.
@@ -666,20 +557,18 @@ async function chat(store: Store, identity: Identity): Promise<void> {
         askedAccounts = true;
         void client.send({ t: "connections_request" });
       }
-      for (const [cid, el] of pending) {
+      for (const [, el] of view.pendingEntries()) {
         const note = el.querySelector(".note");
         if (note) note.textContent = s.computer ? "Sending…" : "Waiting for your computer";
-        void cid;
       }
     },
     history(older) {
-      const before = scroller.scrollHeight;
-      for (const it of older.sort((a, b) => b.seq - a.seq)) place(it, "start");
-      scroller.scrollTop += scroller.scrollHeight - before;
+      view.add(older); // the view keeps what's on screen in place as older messages go in above
       loadingOlder = false;
     },
     historyStart(start) {
-      dropBefore(start);
+      historyStart = Math.max(historyStart, start);
+      view.dropBefore(start);
     },
     historySettings(days) {
       settingsUi?.showHistory(days);
@@ -723,10 +612,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // The device keeps the last 5 days (SPEC §7.5); older messages come from the computer on scroll.
   await store.prune(Math.floor(Date.now() / 1000) - cacheDays(settings) * 86400, (it) => it.t === "approval");
   const cached = await store.items();
-  for (const it of cached) place(it, "end");
-  refold();
+  view.add(cached);
   // a pending approval's card stays usable only if no state was recorded for it
   for (const m of await store.outbox()) showPending(m.cid, m.text, false, m.image);
+  view.draw();
   toBottom();
   setStatus(false, false);
   await client.start();
@@ -734,9 +623,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // older history on demand
   let loadingOlder = false;
   scroller.addEventListener("scroll", () => {
-    if (scroller.scrollTop < 40 && !loadingOlder && oldest > historyStart && oldest !== Infinity && client.computer) {
+    const first = view.oldest();
+    if (scroller.scrollTop < 40 && !loadingOlder && first > historyStart && first !== Infinity && client.computer) {
       loadingOlder = true;
-      void client.send({ t: "history_request", before: oldest, limit: 50 });
+      void client.send({ t: "history_request", before: first, limit: 50 });
     }
   });
 
@@ -810,8 +700,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // A break can happen while the app is open in the background: fold when it's looked at again.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
-    refold();
-    toBottom();
+    view.invalidate(true);
   });
 
   // keep the cache window: prune every hour while open

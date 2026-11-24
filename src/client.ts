@@ -9,6 +9,10 @@ import type { Item, Photo, Store } from "./store";
 
 // SPEC §10.2: "hot-staging" for now, named by the build's commit; an incremental release number once releases start.
 export const APP_VERSION = "hot-staging";
+const LEGACY_ITEMS = new Set(["msg", "approval", "approval_state", "title"]);
+/** A chat item (kept, synced, drawn), not a control frame: the computer marks them (SPEC §6.5). */
+export const isItem = (msg: { t?: unknown; item?: unknown; seq?: unknown; [k: string]: unknown }): boolean =>
+  typeof msg.seq === "number" && (msg.item === true || LEGACY_ITEMS.has(String(msg.t)));
 declare const __BUILD__: string;
 const APP_BUILD = typeof __BUILD__ === "string" ? __BUILD__ : "dev";
 const enc = new TextEncoder();
@@ -394,13 +398,15 @@ export class Client {
       return; // not from our computer, or tampered: drop it
     }
     await this.store.put("ratchet", this.ratchet.toJSON());
+    // Anything the computer numbered for the chat is an item, whatever its type: kept and drawn the same way live
+    // as from a sync, so a new kind of item can't be dropped on one path only (seen: titles, before). The list is
+    // for a computer from before the `item` mark.
+    if (isItem(msg)) {
+      const { item: _, ...it } = msg;
+      await this.accept([it as unknown as Item], true);
+      return;
+    }
     switch (msg.t) {
-      case "msg":
-      case "approval":
-      case "approval_state":
-      case "title": // names a part of the chat, or starts one at a new subject (SPEC §7.4 "Folding")
-        await this.accept([msg as unknown as Item], true);
-        break;
       case "typing":
         this.on.typing(!!msg.on, msg.queued === true);
         break;

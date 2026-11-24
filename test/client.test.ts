@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, HISTORY_CHOICES, browserSites, cacheDays, gatewayProved, modelChoices, traceEvents, traceTime, parsePairLink, shortFingerprint } from "../src/client";
+import { DEFAULT_SETTINGS, HISTORY_CHOICES, browserSites, isItem, cacheDays, gatewayProved, modelChoices, traceEvents, traceTime, parsePairLink, shortFingerprint } from "../src/client";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import * as c from "../src/crypto";
 
@@ -73,5 +73,15 @@ describe("history (SPEC §3.8.1, §7.5)", () => {
   });
   it("offers exactly the lengths the computer accepts", () => {
     expect(HISTORY_CHOICES.map(([d]) => d)).toEqual([null, 365, 90, 30, 7, 1]);
+  });
+});
+
+describe("chat items (SPEC §6.5)", () => {
+  it("anything the computer marks as an item is kept, live too; control frames aren't", () => {
+    expect(isItem({ t: "a_kind_added_later", seq: 9, item: true })).toBe(true); // no list to forget to update
+    expect(isItem({ t: "title", seq: 9 })).toBe(true); // a computer from before the mark
+    expect(isItem({ t: "trace", seq: 9, events: [] })).toBe(false); // has a seq, but isn't an item
+    expect(isItem({ t: "typing" })).toBe(false);
+    expect(isItem({ t: "msg", item: true })).toBe(false); // an item has a number
   });
 });

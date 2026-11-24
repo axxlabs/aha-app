@@ -444,8 +444,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     cards.clear();
     lastDay = "";
     oldest = Infinity;
-    for (const el of col.querySelectorAll("[data-seq], .day")) el.remove();
+    for (const el of col.querySelectorAll("[data-seq], .day, .fold")) el.remove(); // the fold lines too
+    expanded.clear();
     for (const it of keep) place(it, "end");
+    refold();
   }
 
   function approvalCard(it: Item): HTMLElement {

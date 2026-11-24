@@ -666,8 +666,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     devices(list) {
       settingsUi?.showDevices(list);
     },
-    connections(email) {
-      settingsUi?.showConnections(email);
+    connections(emails) {
+      settingsUi?.showConnections(emails);
     },
     browser(list) {
       settingsUi?.showBrowser(list);
@@ -906,7 +906,7 @@ interface SettingsUi {
   showMemories(list: { id: string; text: string }[]): void;
   showDevices(list: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   showBrowser(list: BrowserSite[]): void;
-  showConnections(email: string): void;
+  showConnections(emails: string[]): void;
   showModel(m: { current: string; choices: ModelChoice[] }): void;
   modelNote(text: string): void;
   browserNote(text: string): void;
@@ -1045,17 +1045,8 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
   }
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
   // Settings → Connections (SPEC §7.4): what Aha! is connected to for this person; the address only.
-  const emailText = h("small", {}, "Checking…");
-  const emailBtn = h("button", { class: "btn danger", type: "button", hidden: "" }, "Disconnect Google");
-  let emailAddress = "";
-  emailBtn.onclick = async () => {
-    if (!confirm(`Disconnect ${emailAddress}? Aha! won't be able to use your email or calendar until it's connected again.`)) return;
-    emailBtn.setAttribute("disabled", "");
-    if (!(await client.send({ t: "email_disconnect" }))) {
-      emailBtn.removeAttribute("disabled");
-      alert("Your computer is offline: try again when it's back.");
-    }
-  };
+  // Settings → Connections (SPEC §7.4): one row per connected account, each with its own Disconnect.
+  const connections = h("div", {}, h("p", { class: "fine" }, "Checking…"));
   const reportBtn = h("button", { class: "btn", type: "button" }, "Report");
   const modes = h("div", { class: "segmented", role: "radiogroup", "aria-label": "Appearance" });
   for (const m of APPEARANCES) {
@@ -1110,7 +1101,7 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
         "section",
         {},
         h("h4", {}, "Connections"),
-        h("div", { class: "row" }, h("span", {}, "Google (Gmail and Calendar)", emailText), emailBtn),
+        connections,
       ),
       h("section", {}, h("h4", {}, "Your devices"), devices),
       h(
@@ -1326,11 +1317,24 @@ function openSettings(store: Store, client: Client, onClose: () => void): Settin
       siteNote.textContent = text;
       siteNote.hidden = !text;
     },
-    showConnections(email) {
-      emailAddress = email;
-      emailText.textContent = email || `Not connected. To connect, run \`aha mail connect ${client.identity.name}\` on your computer.`;
-      emailBtn.hidden = !email;
-      emailBtn.removeAttribute("disabled");
+    showConnections(emails) {
+      const how = `run \`aha mail connect ${client.identity.name}\` on your computer`;
+      const rows = emails.map((email) => {
+        const btn = h("button", { class: "btn danger", type: "button" }, "Disconnect");
+        btn.onclick = async () => {
+          if (!confirm(`Disconnect ${email}? Aha! won't be able to use its email or calendar until it's connected again.`)) return;
+          btn.setAttribute("disabled", "");
+          if (!(await client.send({ t: "email_disconnect", email }))) {
+            btn.removeAttribute("disabled");
+            alert("Your computer is offline: try again when it's back.");
+          }
+        };
+        return h("div", { class: "row" }, h("span", {}, email, h("small", {}, "Google: Gmail and Calendar")), btn);
+      });
+      connections.replaceChildren(
+        ...rows,
+        h("p", { class: "fine" }, emails.length ? `To add another account, ${how} again.` : `Not connected. To connect, ${how}.`),
+      );
     },
     showBrowser(list) {
       clearBrowser.disabled = !list.some((s) => !s.trusted || s.signed_in || s.login_saved);

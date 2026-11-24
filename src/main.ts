@@ -358,7 +358,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       pending.delete(it.cid);
     }
     const el = node(it);
-    if (!el) return;
+    if (!el) {
+      if (it.t === "title") queueRefold(); // a title can start a new part: the one before folds now (SPEC §7.4)
+      return;
+    }
     el.dataset.seq = String(it.seq);
     if (where === "start") {
       col.insertBefore(el, col.querySelector("[data-seq]"));

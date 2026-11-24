@@ -24,4 +24,15 @@ describe("markdown", () => {
   it("turns headings into plain text", () => {
     expect(render("## Hello")).not.toContain("<h2");
   });
+
+  it("shows the person's own accounts as labels, and only those", () => {
+    const accounts = ["fe@example.com", "fe.work@example.com"];
+    const html = render("Found in **fe.work@example.com**, and fe@example.com. Sam is sam@example.com.", accounts);
+    expect(html).toContain('<strong><span class="label" title="Your account">fe.work@example.com</span></strong>');
+    expect(html).toContain('<span class="label" title="Your account">fe@example.com</span>.');
+    expect(html).toContain('href="mailto:sam@example.com"'); // someone else's address stays a link
+    expect(html).not.toContain('href="mailto:fe@example.com"');
+    expect(render("in fe@example.com", [])).not.toContain("label");
+    expect(render('in <b x="fe@example.com">', ['fe@example.com"><script>'])).not.toContain("<script>");
+  });
 });

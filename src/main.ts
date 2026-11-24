@@ -288,6 +288,21 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   }
 
   let detailsUi: { seq: number; show(events: TraceEvent[]): void } | null = null;
+  // The person's connected accounts, shown as labels in replies (SPEC §7.4 "Labels"); asked once online.
+  let accounts: string[] = [];
+  let askedAccounts = false;
+  function relabel(list: string[]): void {
+    if (list.join() === accounts.join()) return;
+    accounts = list;
+    for (const old of col.querySelectorAll<HTMLElement>(".aha[data-seq]")) {
+      const it = items.get(Number(old.dataset.seq));
+      const el = it && node(it);
+      if (!el) continue;
+      el.dataset.seq = old.dataset.seq;
+      el.hidden = old.hidden;
+      old.replaceWith(el);
+    }
+  }
 
   function node(it: Item): HTMLElement | null {
     if (it.t === "msg" && it.role === "me") {
@@ -298,7 +313,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     }
     if (it.t === "msg") {
       const el = h("div", { class: "aha" });
-      el.innerHTML = render(String(it.text ?? "")); // markdown-it with html disabled (src/markdown.ts)
+      el.innerHTML = render(String(it.text ?? ""), accounts); // markdown-it, html disabled; accounts as labels
       const img = it.image as { mime?: string; b64?: string } | undefined;
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
       el.append(messageMenu(it.seq));
@@ -642,6 +657,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     },
     status(s) {
       setStatus(s.connected, s.computer);
+      if (s.computer && !askedAccounts) {
+        askedAccounts = true;
+        void client.send({ t: "connections_request" });
+      }
       for (const [cid, el] of pending) {
         const note = el.querySelector(".note");
         if (note) note.textContent = s.computer ? "Sending…" : "Waiting for your computer";
@@ -667,6 +686,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       settingsUi?.showDevices(list);
     },
     connections(emails) {
+      relabel(emails);
       settingsUi?.showConnections(emails);
     },
     browser(list) {

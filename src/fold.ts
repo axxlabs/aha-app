@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 // Folding the chat after a break (SPEC §7.4 "Folding"). The same rule as the computer's aha_local/folding.py:
-// a break is two hours without a message, or a new day. Each part before a break folds into one grey line with
+// a break is two hours without a message, or a new day; and a new subject starts a part of its own. Each part before a break folds into one grey line with
 // its title; what's unfinished stays open; the part still going on doesn't fold and has no title.
 import type { Item } from "./store";
 
@@ -34,11 +34,13 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
   const items = [...all].sort((a, b) => a.seq - b.seq);
   const chat = items.filter(shown);
   const titles = items.filter((it) => it.t === "title");
+  // A new subject starts a part too: the computer marks the message where it starts (SPEC §7.4).
+  const topics = new Set(titles.filter((t) => t.new === true).map((t) => Number(t.from)));
   const lastMine = Math.max(0, ...chat.filter((it) => it.role === "me").map((it) => it.seq));
   const parts: Item[][] = [];
   for (const it of chat) {
     const cur = parts[parts.length - 1];
-    if (!cur || isBreak(cur[cur.length - 1].ts, it.ts)) parts.push([it]);
+    if (!cur || isBreak(cur[cur.length - 1].ts, it.ts) || topics.has(it.seq)) parts.push([it]);
     else cur.push(it);
   }
   return parts.map((part, i) => {

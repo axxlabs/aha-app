@@ -14,7 +14,7 @@ export interface ViewDeps {
   resolve(it: Item, state: string): void; // show a card's answer on its element
   dayLabel(ts: number): string;
   busy(): boolean; // a task is running: the part going on doesn't fold
-  cut?: HTMLElement; // [collapse]: shown while there's a part going on to fold
+  cut?: HTMLElement; // [collapse]: last in the chat, under the latest message, while there's a part going on
   now?: () => number; // seconds (tests)
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
 }
@@ -119,6 +119,7 @@ export function chatView(d: ViewDeps) {
       }
     }
     want.push(...pending.values(), d.working);
+    if (d.cut && !d.cut.hidden) want.push(d.cut);
     // Move only what's out of place, so a card being typed into keeps its focus.
     let cur = d.col.firstChild;
     for (const n of want) {

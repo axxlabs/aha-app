@@ -262,7 +262,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // Fold the conversation going on now, on every device; the next message starts a new part (SPEC §7.4).
   const cutBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold this conversation away" }, "[collapse]");
   cutBtn.onclick = () => void client.send({ t: "cut" });
-  scroller.append(cutBtn); // the chat's lower right corner, just above the message box, kept there while scrolling
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;

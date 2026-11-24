@@ -53,4 +53,16 @@ describe("folding after a break (SPEC §7.4)", () => {
     [p] = plan([ask, card, q, reply, stopped], new Set(["a1"]), later);
     expect([...p.open].sort()).toEqual([reply.seq, stopped.seq].sort()); // with what it was doing
   });
+
+  it("a cut folds the part going on at once, even while working; the next message starts a new part", () => {
+    n = 0;
+    const a = [me(T, "flights to Lisbon"), aha(T + min, "Here are three")];
+    const cut = { seq: ++n, ts: T + 2 * min, t: "cut" } as Item;
+    let parts = plan([...a, cut], new Set(), T + 3 * min, true);
+    expect(parts.length).toBe(1);
+    expect(parts[0].folded).toBe(true);
+    const next = me(T + 4 * min, "what's on Friday");
+    parts = plan([...a, cut, next], new Set(), T + 5 * min);
+    expect(parts.map((p) => p.folded)).toEqual([true, false]);
+  });
 });

@@ -9,7 +9,7 @@ import type { Item, Photo, Store } from "./store";
 
 // SPEC §10.2: "hot-staging" for now, named by the build's commit; an incremental release number once releases start.
 export const APP_VERSION = "hot-staging";
-const LEGACY_ITEMS = new Set(["msg", "approval", "approval_state", "title"]);
+const LEGACY_ITEMS = new Set(["msg", "approval", "approval_state", "title", "cut"]);
 /** A chat item (kept, synced, drawn), not a control frame: the computer marks them (SPEC §6.5). */
 export const isItem = (msg: { t?: unknown; item?: unknown; seq?: unknown; [k: string]: unknown }): boolean =>
   typeof msg.seq === "number" && (msg.item === true || LEGACY_ITEMS.has(String(msg.t)));

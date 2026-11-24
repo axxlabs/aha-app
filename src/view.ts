@@ -14,6 +14,7 @@ export interface ViewDeps {
   resolve(it: Item, state: string): void; // show a card's answer on its element
   dayLabel(ts: number): string;
   busy(): boolean; // a task is running: the part going on doesn't fold
+  cut?: HTMLElement; // [collapse]: shown while there's a part going on to fold
   now?: () => number; // seconds (tests)
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
 }
@@ -87,7 +88,9 @@ export function chatView(d: ViewDeps) {
     const want: Node[] = [];
     let lastDay = "";
     let at = 0;
-    for (const p of plan(all, new Set(states.keys()), t, d.busy())) {
+    const parts = plan(all, new Set(states.keys()), t, d.busy());
+    if (d.cut) d.cut.hidden = !parts.length || parts[parts.length - 1].folded;
+    for (const p of parts) {
       const open = expanded.has(p.first);
       if (p.folded) {
         const line = foldLine(p.first);

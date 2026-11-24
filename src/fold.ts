@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 // Folding the chat after a break (SPEC §7.4 "Folding"). The same rule as the computer's aha_local/folding.py:
-// a break is two hours without a message, or a new day; and a new subject starts a part of its own. Each part before a break folds into one grey line with
+// a break is two hours without a message, or a new day; a new subject starts a part of its own, and so does a
+// cut (the person's [collapse]: everything before it folds at once). Each part before a break folds into one grey line with
 // its title; what's unfinished stays open; the part still going on doesn't fold and has no title.
 import type { Item } from "./store";
 
@@ -36,18 +37,23 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
   const titles = items.filter((it) => it.t === "title");
   // A new subject starts a part too: the computer marks the message where it starts (SPEC §7.4).
   const topics = new Set(titles.filter((t) => t.new === true).map((t) => Number(t.from)));
+  const cuts = items.filter((it) => it.t === "cut").map((it) => it.seq);
+  const cutBetween = (a: number, b: number) => cuts.some((c) => c > a && c < b);
   const lastMine = Math.max(0, ...chat.filter((it) => it.role === "me").map((it) => it.seq));
   const parts: Item[][] = [];
   for (const it of chat) {
     const cur = parts[parts.length - 1];
-    if (!cur || isBreak(cur[cur.length - 1].ts, it.ts) || topics.has(it.seq)) parts.push([it]);
+    const prev = cur?.[cur.length - 1];
+    if (!prev || isBreak(prev.ts, it.ts) || topics.has(it.seq) || cutBetween(prev.seq, it.seq)) parts.push([it]);
     else cur.push(it);
   }
   return parts.map((part, i) => {
     const first = part[0].seq;
     const last = part[part.length - 1].seq;
     // The last part is still going on until a break, or while Aha! works on it.
-    const live = i === parts.length - 1 && (working || !isBreak(part[part.length - 1].ts, now));
+    // A cut after it folds it now, working or not: what Aha! answers next starts a part of its own.
+    const live =
+      i === parts.length - 1 && !cutBetween(last, Infinity) && (working || !isBreak(part[part.length - 1].ts, now));
     const named = titles.filter((t) => Number(t.from) >= first && Number(t.from) <= last).pop();
     const open = new Set<number>();
     part.forEach((it, k) => {

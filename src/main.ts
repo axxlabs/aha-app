@@ -259,6 +259,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const attachment = h("div", { class: "attachment", hidden: "" });
   let photo: Photo | null = null;
   const form = h("form", {}, photoBtn, fileInput, input, sendBtn);
+  // Fold the conversation going on now, on every device; the next message starts a new part (SPEC §7.4).
+  const cutBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold this conversation away" }, "[collapse]");
+  cutBtn.onclick = () => void client.send({ t: "cut" });
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
@@ -269,7 +272,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     installHint,
     banner,
     scroller,
-    h("footer", { class: "composer" }, attachment, form),
+    h("footer", { class: "composer" }, attachment, form, h("div", { class: "cut-row" }, cutBtn)),
   );
 
   const cards = new Map<string, { el: HTMLElement; resolved: boolean }>();
@@ -284,6 +287,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     resolve: (it, st) => applyState(String(it.id), st),
     dayLabel,
     busy: () => busy,
+    cut: cutBtn,
   });
   const toBottom = view.toBottom;
 

@@ -53,6 +53,9 @@ a { color: inherit; text-underline-offset: 3px; }
 .label { display: inline-block; padding: 0 7px; margin: 0 1px; border: 1px solid var(--line); border-radius: 6px;
   background: var(--soft); font-size: .86em; line-height: 1.55; white-space: nowrap; vertical-align: baseline; }
 .label::before { content: "✉"; margin-right: 4px; color: var(--muted); font-size: .9em; }
+/* The person's own account: in the accent colour, set apart from other people's addresses. */
+.label.mine { background: var(--accent-soft); border-color: var(--accent); }
+.label.mine::before { color: var(--ink); }
 .aha p { margin: 0 0 .6em; } .aha p:last-child { margin-bottom: 0; }
 .aha ul, .aha ol { margin: .2em 0 .6em; padding-left: 1.3em; }
 .aha code { background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: .92em; }

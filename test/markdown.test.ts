@@ -25,14 +25,16 @@ describe("markdown", () => {
     expect(render("## Hello")).not.toContain("<h2");
   });
 
-  it("shows the person's own accounts as labels, and only those", () => {
+  it("tags every email address, the person's own in their own colour", () => {
     const accounts = ["fe@example.com", "fe.work@example.com"];
     const html = render("Found in **fe.work@example.com**, and fe@example.com. Sam is sam@example.com.", accounts);
-    expect(html).toContain('<strong><span class="label" title="Your account">fe.work@example.com</span></strong>');
-    expect(html).toContain('<span class="label" title="Your account">fe@example.com</span>.');
-    expect(html).toContain('href="mailto:sam@example.com"'); // someone else's address stays a link
-    expect(html).not.toContain('href="mailto:fe@example.com"');
-    expect(render("in fe@example.com", [])).not.toContain("label");
-    expect(render('in <b x="fe@example.com">', ['fe@example.com"><script>'])).not.toContain("<script>");
+    expect(html).toContain('<strong><span class="label mine" title="Your account">fe.work@example.com</span></strong>');
+    expect(html).toContain('<span class="label mine" title="Your account">fe@example.com</span>.');
+    expect(html).toContain('<span class="label" title="Email address">sam@example.com</span>.');
+    expect(html).not.toContain("mailto:"); // tags, not mail links
+    expect(render("write to [Sam](mailto:sam@example.com)", accounts)).toContain('title="Email address">sam@example.com<');
+    expect(render("in fe@example.com", [])).toContain('class="label"'); // before the accounts are known: still a tag
+    expect(render("`a@b.co` stays code", accounts)).toContain("<code>a@b.co</code>");
+    expect(render('x <b y="q@w.co">', ['q@w.co"><script>'])).not.toContain("<script>");
   });
 });

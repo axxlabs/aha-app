@@ -21,6 +21,7 @@ export interface BackgroundTask {
   now?: boolean; // Run now was asked: it checks as soon as the model is free
   running?: boolean; // a check of it runs now
   last_how?: string; // how the last check ended: waiting | notify | unfinished | interrupted
+  allowed?: string[]; // what the person allowed up front when it was started: its checks keep it (SPEC §3.4)
 }
 export interface TasksState {
   items: BackgroundTask[];
@@ -229,6 +230,7 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
         h("dd", {}, next),
         h("dt", {}, "Until"),
         h("dd", {}, t.until === null ? "No end" : when(t.until)),
+        ...(t.allowed?.length ? [h("dt", {}, "Allowed"), h("dd", {}, h("ul", { class: "allowed" }, ...t.allowed.map((a) => h("li", {}, a))))] : []),
       ),
       t.last || t.last_how ? h("p", { class: "last" }, h("small", {}, `Last check${lastHow(t.last_how)} · ${checks}`), t.last) : h("p", { class: "last" }, h("small", {}, "Not checked yet")),
       foot,

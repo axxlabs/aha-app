@@ -361,7 +361,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const actions = h("div", { class: "actions" });
     // The computer sends each card's icon (SPEC §6.5); a card from an older computer has none.
     const icon = typeof it.icon === "string" && it.icon.length <= 8 ? it.icon : "✋";
-    const card = h("article", { class: "card" }, h("h3", {}, `${icon} ${String(it.title)}`));
+    const card = h("article", { class: `card card-${String(it.kind ?? "action")}` }, h("h3", {}, `${icon} ${String(it.title)}`));
     // Why this card is shown, as the computer's code decided it (SPEC §5.2, §7.4): one popup under the (i), shown
     // on hover and kept open by a click or tap (phones have no hover); a click elsewhere or Escape closes it.
     const why = typeof it.why === "string" ? it.why.trim() : "";
@@ -405,8 +405,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     card.append(dl, actions, stateEl);
     let editing = false;
     // A sign-in card's inputs are open from the start: the person types into them (SPEC §5.3). A check card's
-    // only input is the screenshot.
-    const openInputs = it.kind === "signin" || it.kind === "check";
+    // only input is the screenshot. A permissions card's ticks are open too: the person unticks what it may not do.
+    const openInputs = it.kind === "signin" || it.kind === "check" || it.kind === "permissions";
     const inputFor = (f: (typeof fields)[number]): HTMLInputElement | HTMLTextAreaElement => {
       if (f.kind === "longtext") {
         const ta = h("textarea", { rows: "8", "aria-label": f.label }) as HTMLTextAreaElement;

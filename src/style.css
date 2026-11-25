@@ -88,6 +88,10 @@ a { color: inherit; text-underline-offset: 3px; }
 .card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 4px; font-size: 15px; }
 .card dt { color: var(--muted); } .card dd { margin: 0; overflow-wrap: anywhere; }
 .card dd.long { white-space: pre-wrap; max-height: 40vh; overflow-y: auto; }
+/* A permissions card: each thing it asks for, ticked; the person unticks what it may not do (SPEC §5.3). */
+.card-permissions dl { grid-template-columns: 1fr auto; row-gap: 8px; }
+.card-permissions dt { color: var(--ink); }
+.card-permissions dd input { width: 18px; height: 18px; }
 .card textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); color: inherit; border-radius: 8px; padding: 6px 8px; font: inherit; resize: vertical; min-height: 8em; }
 .card input { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 5px 8px; }
 .card input[type="checkbox"] { width: 22px; height: 22px; padding: 0; accent-color: var(--accent, currentColor); }
@@ -267,6 +271,7 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .tasks .task dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 8px 0 0; font-size: 13px; }
 .tasks .task dt { color: var(--muted); }
 .tasks .task dd { margin: 0; }
+.tasks .task ul.allowed { margin: 0; padding-left: 16px; }
 .tasks .task .last { margin: 8px 0 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
 .tasks .task .last small { display: block; font-size: 12px; color: var(--muted); }
 .tasks .task details { margin-top: 8px; font-size: 13px; flex: 1; min-width: 0; }

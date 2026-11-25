@@ -22,8 +22,17 @@ export interface BackgroundTask {
   running?: boolean; // a check of it runs now
   last_how?: string; // how the last check ended: waiting | notify | unfinished | interrupted
 }
+/** A reminder or a scheduled task (SPEC §3.4): at a set time, once or repeating. */
+export interface Scheduled {
+  id: string;
+  kind: "reminder" | "task";
+  text: string;
+  next: number; // epoch seconds
+  repeat: string; // none | hourly | daily | weekdays | weekly | monthly
+}
 export interface TasksState {
   items: BackgroundTask[];
+  scheduled: Scheduled[];
   idle_since: number;
   idle_after: number;
   busy: boolean;
@@ -82,13 +91,17 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
   const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
   const idle = h("p", { class: "idle" });
   const list = h("div", { class: "task-list" }, offline());
+  const timed = h("div", { class: "task-list" });
+  const timedSection = h("section", { hidden: "" }, h("h4", {}, "At a set time"), timed);
+  const waitingHead = h("h4", { hidden: "" }, "Waiting for something");
   const content = h(
     "div",
     { class: "sheet-in tasks" },
     h("header", {}, h("h2", {}, "Tasks"), close),
     h("p", { class: "fine" }, "What Aha! is waiting for and checks on its own, while nobody is using it. It tells you in the chat once each is done. To start one, ask in the chat."),
     idle,
-    list,
+    timedSection,
+    h("section", {}, waitingHead, list),
   );
   const ask = () => void client.send({ t: "tasks_request" });
   const refresh = setInterval(ask, REFRESH_MS);
@@ -191,8 +204,29 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
   };
 
   /** The list, unless the person is editing a task: a refresh then waits, so it doesn't wipe their text. */
+  // Reminders and scheduled tasks: at their time, whatever the idle time; Cancel is the person's own action.
+  const timedCard = (e: Scheduled) => {
+    const what = e.kind === "reminder" ? "Reminder" : "Scheduled task";
+    const cancel = h("button", { class: "forget", type: "button", "aria-label": `Cancel “${e.text}”`, title: "Cancel" }, icon(ICONS.close));
+    cancel.onclick = async () => {
+      if (!confirm(`Cancel this ${what.toLowerCase()}?`)) return;
+      cancel.setAttribute("disabled", "");
+      if (!(await client.send({ t: "scheduled_cancel", id: e.id }))) cancel.removeAttribute("disabled");
+    };
+    const repeat = e.repeat && e.repeat !== "none" ? ` · repeats ${e.repeat}` : "";
+    return h(
+      "article",
+      { class: `task timed ${e.kind}` },
+      h("header", {}, h("div", {}, h("small", {}, what), h("b", {}, e.text)), cancel),
+      h("p", { class: "when" }, `${when(e.next)}${repeat}`),
+    );
+  };
+
   function draw(): void {
     if (!state || editing) return;
+    timed.replaceChildren(...state.scheduled.map(timedCard));
+    timedSection.hidden = !state.scheduled.length;
+    waitingHead.hidden = !state.scheduled.length;
     list.replaceChildren(
       ...(state.items.length
         ? state.items.map(card)

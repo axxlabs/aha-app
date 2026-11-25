@@ -143,9 +143,12 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.35); }
   body.with-pane dialog.sheet { position: fixed; inset: 0 0 0 auto; margin: 0; width: 30vw; max-height: none;
     height: 100%; border-radius: 0; border-left: 1px solid var(--line); overflow-y: auto; z-index: 5; }
   body.with-pane .sheet-in { padding-top: calc(20px + env(safe-area-inset-top)); }
+  body.with-pane .sheet-in > header { margin-top: calc(-20px - env(safe-area-inset-top)); padding-top: calc(20px + env(safe-area-inset-top)); }
 }
 .sheet-in { padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 18px; }
 .sheet-in header { display: flex; justify-content: space-between; align-items: center; }
+/* The panel's title and its close button stay at the top while it scrolls, so it closes from anywhere. */
+.sheet-in > header { position: sticky; top: 0; z-index: 2; background: var(--bg); margin: -20px -20px -10px; padding: 20px 20px 10px; }
 .sheet-in h2 { margin: 0; font-size: 22px; font-weight: 900; }
 .sheet-in section { display: flex; flex-direction: column; gap: 8px; }
 .sheet-in h4 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }

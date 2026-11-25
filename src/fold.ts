@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
-// Folding the chat after a break (SPEC §7.4 "Folding"). The same rule as the computer's aha_local/folding.py:
+// Folding the chat after a break (SPEC §7.4 "Folding"). The same rule as the computer's aha_local/folding.py (the
+// break is checked against test/vectors/device_messages.json on both sides):
 // a break is two hours without a message, or a new day; a new subject starts a part of its own, and so does a
 // cut (the person's [collapse]: everything before it folds at once). Each part before a break folds into one grey line with
 // its title; what's unfinished stays open; the part still going on doesn't fold and has no title.

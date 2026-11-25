@@ -20,6 +20,7 @@ export interface BackgroundTask {
   created: number;
   now?: boolean; // Run now was asked: it checks as soon as the model is free
   running?: boolean; // a check of it runs now
+  last_how?: string; // how the last check ended: waiting | notify | unfinished | interrupted
 }
 export interface TasksState {
   items: BackgroundTask[];
@@ -47,6 +48,11 @@ export function nextWords(t: Pick<BackgroundTask, "next" | "now" | "running">, n
   if (t.running) return "Checking now";
   if (t.now) return "As soon as Aha! is free";
   return t.next <= now ? "At the next idle time" : `Next check ${when(t.next)}`;
+}
+
+/** How the last check ended, beside "Last check" ("" for a plain WAITING). */
+export function lastHow(how: string | undefined): string {
+  return { notify: " · sent to you", unfinished: " · didn't finish", interrupted: " · stopped early" }[how ?? ""] ?? "";
 }
 
 /** "3 checks so far", "5 checks, 2 updates sent". */
@@ -101,6 +107,7 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
   };
 
   let state: TasksState | null = null;
+  let editing = false;
   const drawIdle = () => {
     idle.textContent = state ? idleLine(state, Date.now() / 1000) : "";
   };
@@ -124,6 +131,33 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
         run.textContent = "Run now";
       }
     };
+    // Edit (SPEC §7.4): the person changes what each check does; their own action, so no card. The next check
+    // runs the new text.
+    const how = h("details", {}, h("summary", {}, "How it checks"), h("p", {}, t.prompt));
+    const editBtn = h("button", { class: "run", type: "button" }, "Edit");
+    const foot = h("div", { class: "task-foot" }, how, editBtn, run);
+    editBtn.onclick = () => {
+      const box = h("textarea", { rows: "6", "aria-label": `What “${t.title}” checks`, maxlength: "2000" }, t.prompt) as HTMLTextAreaElement;
+      const save = h("button", { class: "run", type: "button" }, "Save");
+      const back = h("button", { class: "run quiet", type: "button" }, "Cancel");
+      const form = h("div", { class: "task-edit" }, box, h("div", { class: "task-edit-actions" }, back, save));
+      editing = true;
+      const done = () => {
+        editing = false;
+        form.replaceWith(foot);
+        draw(); // what came in meanwhile
+      };
+      back.onclick = done;
+      save.onclick = async () => {
+        const text = box.value.trim();
+        if (!text) return box.focus();
+        save.setAttribute("disabled", "");
+        if (await client.send({ t: "task_edit", id: t.id, prompt: text })) done(); // the computer sends the new list
+        else save.removeAttribute("disabled");
+      };
+      foot.replaceWith(form);
+      box.focus();
+    };
     const now = Date.now() / 1000;
     const next = nextWords(t, now, when);
     const checks = countWords(t.checks, t.updates ?? 0);
@@ -141,8 +175,8 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
         h("dt", {}, "Until"),
         h("dd", {}, t.until === null ? "No end" : when(t.until)),
       ),
-      t.last ? h("p", { class: "last" }, h("small", {}, `Last check · ${checks}`), t.last) : h("p", { class: "last" }, h("small", {}, "Not checked yet")),
-      h("div", { class: "task-foot" }, h("details", {}, h("summary", {}, "How it checks"), h("p", {}, t.prompt)), run),
+      t.last || t.last_how ? h("p", { class: "last" }, h("small", {}, `Last check${lastHow(t.last_how)} · ${checks}`), t.last) : h("p", { class: "last" }, h("small", {}, "Not checked yet")),
+      foot,
     );
   };
 
@@ -152,11 +186,17 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
     show(s) {
       state = s;
       drawIdle();
-      list.replaceChildren(
-        ...(s.items.length
-          ? s.items.map(card)
-          : [h("p", { class: "fine" }, "Nothing yet. When something can't be done yet (a reply, a delivery, a price), Aha! asks to keep checking for you.")]),
-      );
+      draw();
     },
   };
+
+  /** The list, unless the person is editing a task: a refresh then waits, so it doesn't wipe their text. */
+  function draw(): void {
+    if (!state || editing) return;
+    list.replaceChildren(
+      ...(state.items.length
+        ? state.items.map(card)
+        : [h("p", { class: "fine" }, "Nothing yet. When something can't be done yet (a reply, a delivery, a price), Aha! asks to keep checking for you.")]),
+    );
+  }
 }

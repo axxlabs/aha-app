@@ -274,6 +274,12 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .tasks .run { flex: none; margin-top: 6px; font: inherit; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px;
   border: 1.5px solid var(--accent); background: none; color: inherit; cursor: pointer; }
 .tasks .run:hover:not(:disabled) { background: var(--accent-soft); }
+.tasks .run.quiet { border-color: var(--line); }
+.tasks .task-edit { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.tasks .task-edit textarea { font: inherit; font-size: 14px; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px;
+  background: var(--card); color: inherit; resize: vertical; }
+.tasks .task-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.tasks .task-edit-actions .run { margin-top: 0; }
 .tasks .run:disabled { border-color: var(--line); color: var(--muted); cursor: default; }
 .tasks .task summary { cursor: pointer; color: var(--muted); }
 .tasks .task details p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

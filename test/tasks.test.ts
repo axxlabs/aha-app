@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Axxlabs Limited
 // The Tasks panel's words (SPEC §7.4): how often, how long idle.
 import { describe, expect, it } from "vitest";
-import { countWords, everyWords, idleLine, idleWords, nextWords } from "../src/tasks";
+import { countWords, everyWords, idleLine, idleWords, lastHow, nextWords } from "../src/tasks";
 
 describe("tasks panel", () => {
   it("says how often a task checks", () => {
@@ -19,6 +19,13 @@ describe("tasks panel", () => {
     expect(nextWords({ next: 900 }, 1000, when)).toBe("At the next idle time");
     expect(nextWords({ next: 2000, now: true }, 1000, when)).toBe("As soon as Aha! is free");
     expect(nextWords({ next: 2000, running: true }, 1000, when)).toBe("Checking now");
+  });
+
+  it("says how the last check ended", () => {
+    expect(lastHow("waiting")).toBe("");
+    expect(lastHow("notify")).toBe(" · sent to you");
+    expect(lastHow("interrupted")).toBe(" · stopped early");
+    expect(lastHow(undefined)).toBe("");
   });
 
   it("counts checks and the updates sent", () => {

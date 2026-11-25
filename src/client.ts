@@ -68,6 +68,11 @@ export function cacheDays(settings: Settings): number {
   return settings.historyDays === 1 ? 1 : 5;
 }
 
+/** Drop cached items older than the device keeps (SPEC §7.5); approval cards are kept while they may be open. */
+export function pruneCache(store: Store, settings: Settings): Promise<void> {
+  return store.prune(Math.floor(Date.now() / 1000) - cacheDays(settings) * 86400, (it) => it.t === "approval");
+}
+
 export const HISTORY_CHOICES: [number | null, string][] = [
   [null, "Forever"],
   [365, "1 year"],
@@ -425,7 +430,7 @@ export class Client {
         const days = typeof msg.days === "number" ? msg.days : null;
         this.settings = { ...this.settings, historyDays: days };
         await this.store.put("settings", this.settings);
-        await this.store.prune(Math.floor(Date.now() / 1000) - cacheDays(this.settings) * 86400, (it) => it.t === "approval");
+        await pruneCache(this.store, this.settings);
         this.on.historySettings(days);
         break;
       }

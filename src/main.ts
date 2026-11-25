@@ -5,7 +5,7 @@
 
 import "./style.css";
 import { APPEARANCES, THEMES, applyTheme } from "./themes";
-import { APP_VERSION, Client, HISTORY_CHOICES, cacheDays, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type ModelChoice, type TraceEvent, traceTime, type Identity, type Settings, pair, parsePairLink } from "./client";
+import { APP_VERSION, Client, HISTORY_CHOICES, pruneCache, shortFingerprint, DEFAULT_SETTINGS, type BrowserSite, type ModelChoice, type TraceEvent, traceTime, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e, b64urlDecode } from "./crypto";
 import { chatView } from "./view";
@@ -616,7 +616,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 
   // cached messages first
   // The device keeps the last 5 days (SPEC §7.5); older messages come from the computer on scroll.
-  await store.prune(Math.floor(Date.now() / 1000) - cacheDays(settings) * 86400, (it) => it.t === "approval");
+  await pruneCache(store, settings);
   const cached = await store.items();
   view.add(cached);
   // a pending approval's card stays usable only if no state was recorded for it
@@ -738,7 +738,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 
   // keep the cache window: prune every hour while open
   setInterval(() => {
-    void store.prune(Math.floor(Date.now() / 1000) - cacheDays(client.settings) * 86400, (it) => it.t === "approval");
+    void pruneCache(store, client.settings);
   }, 3_600_000);
 
   if ("serviceWorker" in navigator && import.meta.env.PROD) void navigator.serviceWorker.register("/sw.js");

@@ -269,7 +269,12 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .tasks .task dd { margin: 0; }
 .tasks .task .last { margin: 8px 0 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
 .tasks .task .last small { display: block; font-size: 12px; color: var(--muted); }
-.tasks .task details { margin-top: 8px; font-size: 13px; }
+.tasks .task details { margin-top: 8px; font-size: 13px; flex: 1; min-width: 0; }
+.tasks .task-foot { display: flex; align-items: flex-start; gap: 10px; }
+.tasks .run { flex: none; margin-top: 6px; font: inherit; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px;
+  border: 1.5px solid var(--accent); background: none; color: inherit; cursor: pointer; }
+.tasks .run:hover:not(:disabled) { background: var(--accent-soft); }
+.tasks .run:disabled { border-color: var(--line); color: var(--muted); cursor: default; }
 .tasks .task summary { cursor: pointer; color: var(--muted); }
 .tasks .task details p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tasks .forget { flex: none; border: 0; background: transparent; color: var(--muted); width: 28px; height: 28px;

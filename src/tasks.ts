@@ -18,6 +18,8 @@ export interface BackgroundTask {
   checks: number;
   updates: number; // NOTIFY messages sent so far: the task reports and goes on
   created: number;
+  now?: boolean; // Run now was asked: it checks as soon as the model is free
+  running?: boolean; // a check of it runs now
 }
 export interface TasksState {
   items: BackgroundTask[];
@@ -38,6 +40,13 @@ export function everyWords(seconds: number): string {
   if (m % 1440 === 0) return m === 1440 ? "Every day" : `Every ${m / 1440} days`;
   if (m % 60 === 0) return m === 60 ? "Every hour" : `Every ${m / 60} hours`;
   return `Every ${m} min`;
+}
+
+/** The panel's "Next" line for a task. */
+export function nextWords(t: Pick<BackgroundTask, "next" | "now" | "running">, now: number, when: (epoch: number) => string): string {
+  if (t.running) return "Checking now";
+  if (t.now) return "As soon as Aha! is free";
+  return t.next <= now ? "At the next idle time" : `Next check ${when(t.next)}`;
 }
 
 /** "3 checks so far", "5 checks, 2 updates sent". */
@@ -104,8 +113,19 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
       cancel.setAttribute("disabled", "");
       if (!(await client.send({ t: "task_cancel", id: t.id }))) cancel.removeAttribute("disabled");
     };
+    // Run now (SPEC §3.4): the check runs at once, without waiting for the idle time; only a busy model delays it.
+    const run = h("button", { class: "run", type: "button" }, t.running ? "Checking now…" : t.now ? "Starting…" : "Run now");
+    if (t.running || t.now) run.setAttribute("disabled", "");
+    run.onclick = async () => {
+      run.setAttribute("disabled", "");
+      run.textContent = "Starting…";
+      if (!(await client.send({ t: "task_run", id: t.id }))) {
+        run.removeAttribute("disabled");
+        run.textContent = "Run now";
+      }
+    };
     const now = Date.now() / 1000;
-    const next = t.next <= now ? "At the next idle time" : `Next check ${when(t.next)}`;
+    const next = nextWords(t, now, when);
     const checks = countWords(t.checks, t.updates ?? 0);
     return h(
       "article",
@@ -122,7 +142,7 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
         h("dd", {}, t.until === null ? "No end" : when(t.until)),
       ),
       t.last ? h("p", { class: "last" }, h("small", {}, `Last check · ${checks}`), t.last) : h("p", { class: "last" }, h("small", {}, "Not checked yet")),
-      h("details", {}, h("summary", {}, "How it checks"), h("p", {}, t.prompt)),
+      h("div", { class: "task-foot" }, h("details", {}, h("summary", {}, "How it checks"), h("p", {}, t.prompt)), run),
     );
   };
 

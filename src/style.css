@@ -100,6 +100,9 @@ a { color: inherit; text-underline-offset: 3px; }
   background: transparent; font-weight: 700; }
 .card .actions button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .card .actions button:disabled { opacity: .5; cursor: default; }
+.card .actions { flex-wrap: wrap; }
+.card .actions button.replan { flex-basis: 100%; min-height: 34px; border-color: transparent; background: none; color: var(--muted); font-weight: 600; }
+.card .actions button.replan:hover:not(:disabled) { color: var(--ink); background: var(--soft); }
 .card .state { font-size: 13px; font-weight: 700; color: var(--muted); }
 
 .working { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }

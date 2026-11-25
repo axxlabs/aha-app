@@ -439,7 +439,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const approve = h("button", { class: "primary", type: "button" }, buttons[0] ?? "Approve");
     const edit = buttons.length === 3 ? h("button", { type: "button" }, buttons[1]) : null;
     const decline = h("button", { type: "button" }, buttons[buttons.length - 1] ?? "Decline");
-    actions.append(approve, ...(edit ? [edit] : []), decline);
+    // A permissions card's third way (SPEC §3.4): nothing is allowed and Aha! goes back to its plan.
+    const replan = typeof it.replan === "string" && it.replan ? h("button", { class: "replan", type: "button" }, it.replan.slice(0, 40)) : null;
+    actions.append(approve, ...(edit ? [edit] : []), decline, ...(replan ? [replan] : []));
     showTaps();
     const disable = (text: string) => {
       for (const b of actions.querySelectorAll("button")) b.setAttribute("disabled", "");
@@ -457,6 +459,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     decline.onclick = async () => {
       if (await client.send({ t: "approval_reply", id, decision: "decline" })) disable("Sending…");
     };
+    if (replan)
+      replan.onclick = async () => {
+        if (await client.send({ t: "approval_reply", id, decision: "replan" })) disable("Sending…");
+      };
     if (edit)
       edit.onclick = () => {
         editing = true;

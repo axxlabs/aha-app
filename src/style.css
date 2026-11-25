@@ -80,10 +80,11 @@ a { color: inherit; text-underline-offset: 3px; }
   cursor: help; opacity: .75; }
 .card .info:hover, .card .info:focus-visible, .card .info[aria-expanded="true"] { opacity: 1; color: var(--accent); border-color: var(--accent); }
 /* The (i)'s popup: shown while the (i) is hovered or focused, and kept open by a click or tap. */
-.card .why { position: absolute; top: 38px; right: 10px; z-index: 3; width: max-content; max-width: min(320px, calc(100% - 20px));
+.card .why, .task-note .why { position: absolute; top: 38px; right: 10px; z-index: 3; width: max-content; max-width: min(320px, calc(100% - 20px));
   margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink); background: var(--card); border: 1px solid var(--line);
   border-radius: 10px; padding: 8px 10px; box-shadow: 0 6px 20px rgba(0,0,0,.15); display: none; }
 .card .info:hover + .why, .card .info:focus-visible + .why, .card .info[aria-expanded="true"] + .why { display: block; }
+.task-note .about:hover + .why, .task-note .about:focus-visible + .why, .task-note .about[aria-expanded="true"] + .why { display: block; }
 .card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 4px; font-size: 15px; }
 .card dt { color: var(--muted); } .card dd { margin: 0; overflow-wrap: anywhere; }
 .card dd.long { white-space: pre-wrap; max-height: 40vh; overflow-y: auto; }
@@ -275,6 +276,30 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
   border-radius: 999px; display: grid; place-items: center; cursor: pointer; }
 .tasks .forget:hover { background: var(--soft); color: var(--ink); }
 .tasks .forget svg { width: 14px; height: 14px; }
+/* A background task's note (SPEC §7.4 "Task notes"): a box easy to spot while scrolling, with a small title
+   saying which task ran; the accent strip's colour says how it went. */
+.task-note { position: relative; align-self: stretch; margin: 14px 0; padding: 14px 16px 12px; border-radius: 16px;
+  background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.task-note.done { border-left-color: var(--ok); }
+.task-note.failed { border-left-color: var(--warn); }
+.task-note.expired { border-left-color: var(--muted); }
+/* The task's description: a small list button at the box's top right (the (i) is for help only). */
+.task-note .about { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; padding: 0; border-radius: 8px;
+  border: 0; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.task-note .about svg { width: 16px; height: 16px; }
+.task-note .about:hover, .task-note .about:focus-visible, .task-note .about[aria-expanded="true"] { background: var(--soft); color: var(--ink); }
+.task-note .why.task-about { top: 40px; max-width: min(380px, calc(100% - 20px)); }
+.task-note .task-about p { margin: 4px 0; white-space: pre-wrap; }
+.task-note .task-about small { color: var(--muted); }
+.task-note header { padding-right: 28px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 8px; font-size: 12px; }
+.task-note header b { text-transform: uppercase; letter-spacing: .8px; font-weight: 800; color: var(--accent); }
+.task-note.done header b { color: var(--ok); }
+.task-note.failed header b { color: var(--warn); }
+.task-note.expired header b { color: var(--muted); }
+.task-note header span { color: var(--muted); font-weight: 600; overflow-wrap: anywhere; }
+.task-note .aha > :first-child { margin-top: 0; }
+.task-note .aha > :last-child { margin-bottom: 0; }
 /* A tool Aha! used (SPEC §7.4 "Tools used"): small side info between the messages, not a reply. */
 .tool-use { font-size: 12px; color: var(--muted); margin: -2px 0 2px; padding-left: 2px; }
 .tool-use::before { content: "↳ "; opacity: .7; }

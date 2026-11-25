@@ -9,11 +9,11 @@ import { APP_VERSION, Client, pruneCache, shortFingerprint, DEFAULT_SETTINGS, ty
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e } from "./crypto";
 import { chatView } from "./view";
-import { BUILD, ICONS, h, icon } from "./dom";
+import { BUILD, ICONS, h, icon, infoPopup } from "./dom";
 import { openDetails } from "./details";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
-import { type TasksUi, openTasks } from "./tasks";
+import { type TasksUi, everyWords, openTasks } from "./tasks";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
@@ -277,6 +277,15 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   }
   window.addEventListener("aha-dates", () => view.remake((it) => it.t === "msg" && it.role === "aha"));
 
+  /** A background task's note on a message: its kind's words and the task's title, or null. */
+  function taskNote(task: unknown): { kind: string; head: string; title: string; prompt: string; every: number } | null {
+    if (!task || typeof task !== "object") return null;
+    const { kind, title, prompt, every } = task as { kind?: unknown; title?: unknown; prompt?: unknown; every?: unknown };
+    const heads: Record<string, string> = { update: "Task update", done: "Task done", failed: "Task failed", expired: "Task expired" };
+    const k = typeof kind === "string" && kind in heads ? kind : "update";
+    return { kind: k, head: heads[k], title: typeof title === "string" ? title : "", prompt: typeof prompt === "string" ? prompt : "", every: typeof every === "number" && every > 0 ? every : 0 };
+  }
+
   function node(it: Item): HTMLElement | null {
     if (it.t === "msg" && it.role === "me") {
       const el = h("div", { class: "me" }, String(it.text ?? ""));
@@ -289,6 +298,18 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       el.innerHTML = render(String(it.text ?? ""), accounts, client.settings.dates); // html disabled; labels
       const img = it.image as { mime?: string; b64?: string } | undefined;
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
+      const note = taskNote(it.task);
+      if (note) {
+        // A background task's news (SPEC §7.4 "Task notes"): a box with a small title saying which task ran.
+        const box = h("section", { class: `task-note ${note.kind}`, "aria-label": `${note.head}: ${note.title}` }, h("header", {}, h("b", {}, note.head), h("span", {}, note.title)), el);
+        // Its (i): the task's full description, what each check does and how often (SPEC §7.4 "Task notes").
+        if (note.prompt) {
+          const about = h("div", {}, h("b", {}, note.title), h("p", {}, note.prompt), note.every ? h("small", {}, everyWords(note.every)) : "");
+          box.append(...infoPopup(about, "What this task does", "about"));
+        }
+        box.append(messageMenu(it.seq));
+        return box;
+      }
       el.append(messageMenu(it.seq));
       return el;
     }
@@ -345,22 +366,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     // on hover and kept open by a click or tap (phones have no hover); a click elsewhere or Escape closes it.
     const why = typeof it.why === "string" ? it.why.trim() : "";
     if (why) {
-      const tip = h("p", { class: "why", role: "tooltip", id: `why-${String(it.id)}` }, why);
-      const info = h("button", { class: "info", type: "button", "aria-label": "Why am I asked?", "aria-expanded": "false", "aria-describedby": tip.id }, "i");
-      const pin = (open: boolean) => {
-        info.setAttribute("aria-expanded", String(open));
-        if (open) document.addEventListener("pointerdown", outside, true);
-        else document.removeEventListener("pointerdown", outside, true);
-      };
-      const outside = (e: Event) => {
-        if (!info.contains(e.target as Node) && !tip.contains(e.target as Node)) pin(false);
-      };
-      info.onclick = () => pin(info.getAttribute("aria-expanded") !== "true");
-      info.onkeydown = (e) => {
-        if (e.key === "Escape") pin(false);
-      };
       card.classList.add("has-why");
-      card.append(info, tip);
+      card.append(...infoPopup(why, "Why am I asked?"));
     }
     const img = it.image as { mime?: string; b64?: string } | undefined;
     const shot = img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "") ? (h("img", { alt: "Screenshot of the page", src: `data:${img.mime};base64,${img.b64}` }) as HTMLImageElement) : null;

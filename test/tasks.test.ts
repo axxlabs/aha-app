@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Axxlabs Limited
 // The Tasks panel's words (SPEC §7.4): how often, how long idle.
 import { describe, expect, it } from "vitest";
-import { countWords, everyWords, idleLine, idleWords, lastHow, nextWords } from "../src/tasks";
+import { countWords, everyWords, fromLocalInput, idleLine, idleWords, lastHow, nextWords, toLocalInput } from "../src/tasks";
 
 describe("tasks panel", () => {
   it("says how often a task checks", () => {
@@ -20,6 +20,14 @@ describe("tasks panel", () => {
     expect(nextWords({ next: 2000, now: true }, 1000, when)).toBe("As soon as Aha! is free · then 14:35");
     expect(nextWords({ next: 2000, running: true }, 1000, when)).toBe("Checking now · then 14:35");
     expect(nextWords({ next: 900, running: true }, 1000, when)).toBe("Checking now");
+  });
+
+  it("turns times into the edit form's inputs and back", () => {
+    const epoch = Math.round(new Date(2026, 10, 28, 18, 5).getTime() / 1000);
+    expect(toLocalInput(epoch)).toBe("2026-11-28T18:05");
+    expect(fromLocalInput("2026-11-28T18:05")).toBe(epoch);
+    expect(fromLocalInput("")).toBeNull();
+    expect(fromLocalInput("not a time")).toBeNull();
   });
 
   it("says how the last check ended", () => {

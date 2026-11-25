@@ -43,6 +43,20 @@ export function everyWords(seconds: number): string {
   return `Every ${m} min`;
 }
 
+/** An epoch time as a datetime-local input's value, in this device's time. */
+export function toLocalInput(epoch: number): string {
+  const d = new Date(epoch * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** A datetime-local input's value as epoch seconds, or null when empty or not a time. */
+export function fromLocalInput(value: string): number | null {
+  if (!value) return null;
+  const t = new Date(value).getTime();
+  return Number.isNaN(t) ? null : Math.round(t / 1000);
+}
+
 /** The panel's "Next" line for a task. */
 export function nextWords(t: Pick<BackgroundTask, "next" | "now" | "running">, now: number, when: (epoch: number) => string): string {
   const planned = t.next <= now ? "At the next idle time" : `Next check ${when(t.next)}`;
@@ -140,10 +154,30 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
     const editBtn = h("button", { class: "run", type: "button" }, "Edit");
     const foot = h("div", { class: "task-foot" }, how, editBtn, run);
     editBtn.onclick = () => {
-      const box = h("textarea", { rows: "6", "aria-label": `What “${t.title}” checks`, maxlength: "2000" }, t.prompt) as HTMLTextAreaElement;
+      // Every field (SPEC §7.4): what it waits for, what it checks, how often, the next check and until when.
+      const field = (label: string, input: HTMLElement) => h("label", {}, h("span", {}, label), input);
+      const title = h("input", { type: "text", value: t.title, maxlength: "120" }) as HTMLInputElement;
+      const box = h("textarea", { rows: "6", maxlength: "2000" }, t.prompt) as HTMLTextAreaElement;
+      const every = h("input", { type: "number", min: "5", step: "1", value: String(Math.round(t.every / 60)) }) as HTMLInputElement;
+      const nextAt = h("input", { type: "datetime-local", value: toLocalInput(Math.max(t.next, Date.now() / 1000)) }) as HTMLInputElement;
+      const until = h("input", { type: "datetime-local", value: t.until === null ? "" : toLocalInput(t.until) }) as HTMLInputElement;
+      const noEnd = h("input", { type: "checkbox" }) as HTMLInputElement;
+      noEnd.checked = t.until === null;
+      until.disabled = noEnd.checked;
+      noEnd.onchange = () => (until.disabled = noEnd.checked);
+      const error = h("p", { class: "fine error", hidden: "" });
       const save = h("button", { class: "run", type: "button" }, "Save");
       const back = h("button", { class: "run quiet", type: "button" }, "Cancel");
-      const form = h("div", { class: "task-edit" }, box, h("div", { class: "task-edit-actions" }, back, save));
+      const form = h(
+        "div",
+        { class: "task-edit" },
+        field("Waiting for", title),
+        field("How it checks", box),
+        h("div", { class: "task-edit-row" }, field("Check every (minutes)", every), field("Next check", nextAt)),
+        h("div", { class: "task-edit-row" }, field("Until", until), h("label", { class: "check" }, noEnd, h("span", {}, "No end"))),
+        error,
+        h("div", { class: "task-edit-actions" }, back, save),
+      );
       editing = true;
       const done = () => {
         editing = false;
@@ -152,10 +186,28 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
       };
       back.onclick = done;
       save.onclick = async () => {
-        const text = box.value.trim();
-        if (!text) return box.focus();
+        const minutes = Number(every.value);
+        const next = fromLocalInput(nextAt.value);
+        const end = noEnd.checked ? null : fromLocalInput(until.value);
+        const why = !title.value.trim()
+          ? "Say what it waits for."
+          : !box.value.trim()
+            ? "Say how it checks."
+            : !(minutes >= 5)
+              ? "Check at most every 5 minutes."
+              : next === null
+                ? "Choose the next check."
+                : !noEnd.checked && end === null
+                  ? "Choose when it ends, or No end."
+                  : end !== null && next >= end
+                    ? "The next check must be before it ends."
+                    : "";
+        error.textContent = why;
+        error.hidden = !why;
+        if (why) return;
         save.setAttribute("disabled", "");
-        if (await client.send({ t: "task_edit", id: t.id, prompt: text })) done(); // the computer sends the new list
+        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), every: Math.round(minutes) * 60, next, until: end });
+        if (sent) done(); // the computer sends the new list
         else save.removeAttribute("disabled");
       };
       foot.replaceWith(form);

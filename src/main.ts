@@ -291,6 +291,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       return el;
     }
     if (it.t === "approval") return approvalCard(it);
+    // A tool Aha! started using, as it happened (SPEC §7.4 "Tools used"): side info, not part of a reply.
+    if (it.t === "tool" && typeof it.label === "string") return h("div", { class: "tool-use" }, `Used ${it.label}`);
     return null;
   }
 

@@ -19,7 +19,7 @@ export interface ViewDeps {
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
 }
 
-const shown = (it: Item) => it.t === "msg" || it.t === "approval";
+const shown = (it: Item) => it.t === "msg" || it.t === "approval" || it.t === "tool";
 
 export function chatView(d: ViewDeps) {
   const items = new Map<number, Item>();

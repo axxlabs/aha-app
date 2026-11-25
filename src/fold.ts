@@ -18,7 +18,7 @@ export interface Part {
   open: Set<number>; // seqs that stay visible while it's folded
 }
 
-const shown = (it: Item) => it.t === "msg" || it.t === "approval";
+const shown = (it: Item) => it.t === "msg" || it.t === "approval" || it.t === "tool"; // aha_local/folding.py SHOWN
 const sameDay = (a: number, b: number) => new Date(a * 1000).toDateString() === new Date(b * 1000).toDateString();
 export const isBreak = (before: number, after: number) => after - before >= BREAK_SECONDS || !sameDay(before, after);
 

@@ -285,8 +285,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (it.t === "msg") {
       const el = h("div", { class: "aha" });
       el.innerHTML = render(String(it.text ?? ""), accounts, client.settings.dates); // html disabled; labels
-      const used = toolsLine(it.tools);
-      if (used) el.prepend(h("div", { class: "tools-used" }, used));
       const img = it.image as { mime?: string; b64?: string } | undefined;
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
       el.append(messageMenu(it.seq));
@@ -294,15 +292,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     }
     if (it.t === "approval") return approvalCard(it);
     return null;
-  }
-
-  /** What the model used for this answer, from the computer (SPEC §7.4 "Tools used"): "Used email ×2 · browser". */
-  function toolsLine(tools: unknown): string {
-    if (!Array.isArray(tools)) return "";
-    const parts = tools
-      .filter((t): t is { label: string; count: number } => typeof t?.label === "string" && typeof t?.count === "number")
-      .map((t) => (t.count > 1 ? `${t.label} ×${t.count}` : t.label));
-    return parts.length ? `Used ${parts.join(" · ")}` : "";
   }
 
   /** ⋯ under each of Aha!'s messages: Show details (SPEC §3.8). */

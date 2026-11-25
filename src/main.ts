@@ -341,18 +341,26 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     // The computer sends each card's icon (SPEC §6.5); a card from an older computer has none.
     const icon = typeof it.icon === "string" && it.icon.length <= 8 ? it.icon : "✋";
     const card = h("article", { class: "card" }, h("h3", {}, `${icon} ${String(it.title)}`));
-    // Why this card is shown, as the computer's code decided it (SPEC §5.2, §7.4): a tooltip on hover, and a tap
-    // shows it in the card (phones have no hover).
+    // Why this card is shown, as the computer's code decided it (SPEC §5.2, §7.4): one popup under the (i), shown
+    // on hover and kept open by a click or tap (phones have no hover); a click elsewhere or Escape closes it.
     const why = typeof it.why === "string" ? it.why.trim() : "";
     if (why) {
-      const note = h("p", { class: "why", hidden: "" }, why);
-      const info = h("button", { class: "info", type: "button", title: why, "aria-label": "Why am I asked?", "aria-expanded": "false" }, "i");
-      info.onclick = () => {
-        note.hidden = !note.hidden;
-        info.setAttribute("aria-expanded", String(!note.hidden));
+      const tip = h("p", { class: "why", role: "tooltip", id: `why-${String(it.id)}` }, why);
+      const info = h("button", { class: "info", type: "button", "aria-label": "Why am I asked?", "aria-expanded": "false", "aria-describedby": tip.id }, "i");
+      const pin = (open: boolean) => {
+        info.setAttribute("aria-expanded", String(open));
+        if (open) document.addEventListener("pointerdown", outside, true);
+        else document.removeEventListener("pointerdown", outside, true);
+      };
+      const outside = (e: Event) => {
+        if (!info.contains(e.target as Node) && !tip.contains(e.target as Node)) pin(false);
+      };
+      info.onclick = () => pin(info.getAttribute("aria-expanded") !== "true");
+      info.onkeydown = (e) => {
+        if (e.key === "Escape") pin(false);
       };
       card.classList.add("has-why");
-      card.append(info, note);
+      card.append(info, tip);
     }
     const img = it.image as { mime?: string; b64?: string } | undefined;
     const shot = img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "") ? (h("img", { alt: "Screenshot of the page", src: `data:${img.mime};base64,${img.b64}` }) as HTMLImageElement) : null;

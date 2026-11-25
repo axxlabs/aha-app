@@ -365,20 +365,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     });
     const stateEl = h("div", { class: "state" });
     const actions = h("div", { class: "actions" });
-    const icon =
-      it.kind === "memory" || it.kind === "forget"
-        ? "🧠"
-        : it.kind === "email" || it.kind === "draft"
-          ? "✉️"
-          : it.kind === "signin"
-            ? "🔑"
-            : it.kind === "schedule"
-              ? "⏰"
-              : it.kind === "calendar" || it.kind === "calendar_delete"
-                ? "📅"
-              : it.kind === "check"
-                ? "🧩"
-                : "✋";
+    // The computer sends each card's icon (SPEC §6.5); a card from an older computer has none.
+    const icon = typeof it.icon === "string" && it.icon.length <= 8 ? it.icon : "✋";
     const card = h("article", { class: "card" }, h("h3", {}, `${icon} ${String(it.title)}`));
     // Why this card is shown, as the computer's code decided it (SPEC §5.2, §7.4): a tooltip on hover, and a tap
     // shows it in the card (phones have no hover).

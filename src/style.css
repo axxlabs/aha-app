@@ -274,11 +274,6 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .tasks .run { flex: none; margin-top: 6px; font: inherit; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px;
   border: 1.5px solid var(--accent); background: none; color: inherit; cursor: pointer; }
 .tasks .run:hover:not(:disabled) { background: var(--accent-soft); }
-.tasks section { display: flex; flex-direction: column; gap: 8px; }
-.tasks .timed header div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.tasks .timed header small { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; font-weight: 800; color: var(--accent); }
-.tasks .timed.reminder header small { color: var(--muted); }
-.tasks .timed .when { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 .tasks .run.quiet { border-color: var(--line); }
 .tasks .task-edit { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .tasks .task-edit textarea { font: inherit; font-size: 14px; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px;

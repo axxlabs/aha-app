@@ -445,7 +445,6 @@ export class Client {
       case "tasks":
         this.on.tasks({
           items: Array.isArray(msg.items) ? msg.items : [],
-          scheduled: Array.isArray(msg.scheduled) ? msg.scheduled : [],
           idle_since: Number(msg.idle_since) || 0,
           idle_after: Number(msg.idle_after) || 300,
           busy: msg.busy === true,

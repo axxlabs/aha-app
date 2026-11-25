@@ -227,7 +227,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
         "section",
         {},
         h("h4", {}, "Clear"),
-        h("div", { class: "row" }, h("span", {}, "Chat history", h("small", {}, "From your computer and all your devices. Memories, reminders and sign-ins stay.")), clearHistory),
+        h("div", { class: "row" }, h("span", {}, "Chat history", h("small", {}, "From your computer and all your devices. Memories, tasks and sign-ins stay.")), clearHistory),
         h("div", { class: "row" }, h("span", {}, "Browser data", h("small", {}, "Everything Aha!'s browser remembers: signs you out of every site. Trusted sites stay.")), clearBrowser),
       ),
       h(
@@ -291,7 +291,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
     }
   };
   clearHistory.onclick = async () => {
-    if (!confirm("Delete your chat history from your computer and all your devices? Memories, reminders and sign-ins stay.")) return;
+    if (!confirm("Delete your chat history from your computer and all your devices? Memories, tasks and sign-ins stay.")) return;
     clearHistory.disabled = true;
     if (await client.send({ t: "history_clear" })) clearHistory.textContent = "Chat history cleared";
     else {

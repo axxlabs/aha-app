@@ -16,6 +16,7 @@ export interface BackgroundTask {
   next: number;
   last: string;
   checks: number;
+  updates: number; // NOTIFY messages sent so far: the task reports and goes on
   created: number;
 }
 export interface TasksState {
@@ -37,6 +38,13 @@ export function everyWords(seconds: number): string {
   if (m % 1440 === 0) return m === 1440 ? "Every day" : `Every ${m / 1440} days`;
   if (m % 60 === 0) return m === 60 ? "Every hour" : `Every ${m / 60} hours`;
   return `Every ${m} min`;
+}
+
+/** "3 checks so far", "5 checks, 2 updates sent". */
+export function countWords(checks: number, updates: number): string {
+  const c = checks === 1 ? "1 check" : `${checks} checks`;
+  if (!updates) return `${c} so far`;
+  return `${c}, ${updates === 1 ? "1 update" : `${updates} updates`} sent`;
 }
 
 /** "12 min", "2 h 5 min", "less than a minute". */
@@ -98,7 +106,7 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
     };
     const now = Date.now() / 1000;
     const next = t.next <= now ? "At the next idle time" : `Next check ${when(t.next)}`;
-    const checks = t.checks === 1 ? "1 check so far" : `${t.checks} checks so far`;
+    const checks = countWords(t.checks, t.updates ?? 0);
     return h(
       "article",
       { class: "task" },

@@ -13,6 +13,7 @@ import { BUILD, ICONS, h, icon } from "./dom";
 import { openDetails } from "./details";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
+import { type TasksUi, openTasks } from "./tasks";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
@@ -207,6 +208,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const statusBox = h("div", { class: "status" }, h("span", {}, dot, statusText), h("span", { class: "lock" }, icon(ICONS.lock), " End-to-end encrypted"));
   const menu = h("button", { class: "icon-btn", type: "button", "aria-label": "Settings", title: "Settings" }, icon(ICONS.gear));
   const memoryBtn = h("button", { class: "icon-btn", type: "button", "aria-label": "Memory", title: "Memory" }, icon(ICONS.memory));
+  const tasksBtn = h("button", { class: "icon-btn", type: "button", "aria-label": "Tasks", title: "Tasks" }, icon(ICONS.tasks));
   const banner = h("div", { class: "banner", hidden: "" });
   const col = h("div", { class: "col" });
   // A link in a reply, in the installed app with "In my browser" chosen: hand it to the phone's browser (links.ts).
@@ -237,7 +239,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const installHint = h("div", { class: "banner" }, "Safari may delete this pairing after 7 days without a visit. To keep Aha! on your Home Screen, add it (Share → Add to Home Screen) and pair it again there: it keeps its own data, so this pairing isn't in it.");
   installHint.hidden = !ios || installed;
   app.replaceChildren(
-    h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, memoryBtn, menu)),
+    h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, tasksBtn, memoryBtn, menu)),
     installHint,
     banner,
     scroller,
@@ -553,6 +555,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     memories(list, topics) {
       memoryUi?.show(list, topics);
     },
+    tasks(state) {
+      tasksUi?.show(state);
+    },
     devices(list) {
       settingsUi?.showDevices(list);
     },
@@ -695,18 +700,29 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     showPending(cid, text, client.computer, image);
   });
 
-  // Settings and Memory share the side pane: each button toggles its own, and opening one closes the other.
+  // Settings, Memory and Tasks share the side pane: each button toggles its own, and opening one closes the others.
   let settingsUi: SettingsUi | null = null;
   let memoryUi: MemoryUi | null = null;
+  let tasksUi: TasksUi | null = null;
+  const closePanes = () => {
+    settingsUi?.close();
+    memoryUi?.close();
+    tasksUi?.close();
+  };
   menu.onclick = () => {
     if (settingsUi) return settingsUi.close();
-    memoryUi?.close();
+    closePanes();
     settingsUi = openSettings(store, client, () => (settingsUi = null));
   };
   memoryBtn.onclick = () => {
     if (memoryUi) return memoryUi.close();
-    settingsUi?.close();
+    closePanes();
     memoryUi = openMemory(client, () => (memoryUi = null));
+  };
+  tasksBtn.onclick = () => {
+    if (tasksUi) return tasksUi.close();
+    closePanes();
+    tasksUi = openTasks(client, () => (tasksUi = null));
   };
 
   // A break can happen while the app is open in the background: fold when it's looked at again.

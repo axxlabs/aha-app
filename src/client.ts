@@ -7,6 +7,7 @@
 import * as c from "./crypto";
 import type { DateFormat } from "./markdown";
 import type { Item, Photo, Store } from "./store";
+import type { TasksState } from "./tasks";
 
 // SPEC §10.2: "hot-staging" for now, named by the build's commit; an incremental release number once releases start.
 export const APP_VERSION = "hot-staging";
@@ -266,6 +267,7 @@ export interface Events {
   historyStart(start: number): void; // items before `start` were deleted on the computer
   historySettings(days: number | null): void;
   memories(items: { id: string; text: string }[], topics: { id: string; title: string; text: string; ts: number }[]): void;
+  tasks(state: TasksState): void; // the background tasks and the idle time (SPEC §3.4)
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   browser(sites: BrowserSite[]): void;
   connections(emails: string[]): void; // every connected account (SPEC §3.4 "Connections")
@@ -439,6 +441,14 @@ export class Client {
         break;
       case "memories":
         this.on.memories(msg.items ?? [], Array.isArray(msg.topics) ? msg.topics : []);
+        break;
+      case "tasks":
+        this.on.tasks({
+          items: Array.isArray(msg.items) ? msg.items : [],
+          idle_since: Number(msg.idle_since) || 0,
+          idle_after: Number(msg.idle_after) || 300,
+          busy: msg.busy === true,
+        });
         break;
       case "devices":
         this.on.devices(msg.items ?? []);

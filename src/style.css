@@ -31,6 +31,13 @@ a { color: inherit; text-underline-offset: 3px; }
 .icon-btn { border: 1px solid var(--line); background: var(--card); border-radius: 999px; width: 38px; height: 38px;
   display: inline-flex; align-items: center; justify-content: center; }
 .right { display: flex; align-items: center; gap: 8px; }
+/* Three buttons beside the status: on a narrow phone they shrink a little, and on the narrowest the lock line goes. */
+@media (max-width: 400px) {
+  .top { padding-left: 14px; padding-right: 14px; gap: 8px; }
+  .right { gap: 6px; }
+  .icon-btn { width: 34px; height: 34px; }
+}
+@media (max-width: 350px) { .status .lock { display: none; } }
 
 .banner { margin: 10px auto 0; max-width: 760px; width: calc(100% - 32px); padding: 9px 14px; border-radius: 12px;
   background: var(--accent-soft); font-size: 14px; }
@@ -244,6 +251,24 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
   border-radius: 999px; display: grid; place-items: center; cursor: pointer; }
 .memory .forget:hover { background: var(--soft); color: var(--ink); }
 .memory .forget svg { width: 14px; height: 14px; }
+/* Tasks (tasks.ts, SPEC §7.4): the idle line, then each background task as a card. */
+.tasks .idle { margin: 0; padding: 8px 12px; border-radius: 12px; background: var(--soft); font-size: 13px; color: var(--muted); }
+.tasks .task-list { display: flex; flex-direction: column; gap: 10px; }
+.tasks .task { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 12px 12px 12px 14px; }
+.tasks .task header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.tasks .task b { font-size: 15px; overflow-wrap: anywhere; }
+.tasks .task dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 8px 0 0; font-size: 13px; }
+.tasks .task dt { color: var(--muted); }
+.tasks .task dd { margin: 0; }
+.tasks .task .last { margin: 8px 0 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.tasks .task .last small { display: block; font-size: 12px; color: var(--muted); }
+.tasks .task details { margin-top: 8px; font-size: 13px; }
+.tasks .task summary { cursor: pointer; color: var(--muted); }
+.tasks .task details p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tasks .forget { flex: none; border: 0; background: transparent; color: var(--muted); width: 28px; height: 28px;
+  border-radius: 999px; display: grid; place-items: center; cursor: pointer; }
+.tasks .forget:hover { background: var(--soft); color: var(--ink); }
+.tasks .forget svg { width: 14px; height: 14px; }
 /* A tool Aha! used (SPEC §7.4 "Tools used"): small side info between the messages, not a reply. */
 .tool-use { font-size: 12px; color: var(--muted); margin: -2px 0 2px; padding-left: 2px; }
 .tool-use::before { content: "↳ "; opacity: .7; }

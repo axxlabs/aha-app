@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 // The messages between the app and the computer (SPEC §6.5), checked against the file both repos share.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BREAK_SECONDS } from "../src/fold";
 
@@ -11,7 +11,7 @@ const src = (name: string) => readFileSync(new URL(`../src/${name}`, import.meta
 describe("device messages", () => {
   it("sends only messages the computer handles", () => {
     const sent = new Set<string>();
-    for (const file of ["client.ts", "main.ts"]) {
+    for (const file of readdirSync(new URL("../src/", import.meta.url)).filter((f) => f.endsWith(".ts"))) {
       for (const m of src(file).matchAll(/\bsend\(\{ t: "([a-z_]+)"/g)) sent.add(m[1]);
     }
     expect(sent.size).toBeGreaterThan(10);

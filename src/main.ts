@@ -12,6 +12,7 @@ import { chatView } from "./view";
 import { BUILD, ICONS, h, icon } from "./dom";
 import { openDetails } from "./details";
 import { type SettingsUi, openSettings } from "./settings";
+import { type MemoryUi, openMemory } from "./memory";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
@@ -204,7 +205,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const statusText = h("b", {});
   const dot = h("span", { class: "dot" });
   const statusBox = h("div", { class: "status" }, h("span", {}, dot, statusText), h("span", { class: "lock" }, icon(ICONS.lock), " End-to-end encrypted"));
-  const menu = h("button", { class: "icon-btn", type: "button", "aria-label": "Settings" }, icon(ICONS.menu));
+  const menu = h("button", { class: "icon-btn", type: "button", "aria-label": "Settings", title: "Settings" }, icon(ICONS.gear));
+  const memoryBtn = h("button", { class: "icon-btn", type: "button", "aria-label": "Memory", title: "Memory" }, icon(ICONS.memory));
   const banner = h("div", { class: "banner", hidden: "" });
   const col = h("div", { class: "col" });
   // A link in a reply, in the installed app with "In my browser" chosen: hand it to the phone's browser (links.ts).
@@ -235,7 +237,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const installHint = h("div", { class: "banner" }, "Safari may delete this pairing after 7 days without a visit. To keep Aha! on your Home Screen, add it (Share → Add to Home Screen) and pair it again there: it keeps its own data, so this pairing isn't in it.");
   installHint.hidden = !ios || installed;
   app.replaceChildren(
-    h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, menu)),
+    h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, memoryBtn, menu)),
     installHint,
     banner,
     scroller,
@@ -546,8 +548,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     historySettings(days) {
       settingsUi?.showHistory(days);
     },
-    memories(list) {
-      settingsUi?.showMemories(list);
+    memories(list, topics) {
+      memoryUi?.show(list, topics);
     },
     devices(list) {
       settingsUi?.showDevices(list);
@@ -691,10 +693,18 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     showPending(cid, text, client.computer, image);
   });
 
+  // Settings and Memory share the side pane: each button toggles its own, and opening one closes the other.
   let settingsUi: SettingsUi | null = null;
+  let memoryUi: MemoryUi | null = null;
   menu.onclick = () => {
-    if (settingsUi) return settingsUi.close(); // the menu button toggles the side pane
+    if (settingsUi) return settingsUi.close();
+    memoryUi?.close();
     settingsUi = openSettings(store, client, () => (settingsUi = null));
+  };
+  memoryBtn.onclick = () => {
+    if (memoryUi) return memoryUi.close();
+    settingsUi?.close();
+    memoryUi = openMemory(client, () => (memoryUi = null));
   };
 
   // A break can happen while the app is open in the background: fold when it's looked at again.

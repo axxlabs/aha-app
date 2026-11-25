@@ -265,7 +265,7 @@ export interface Events {
   history(items: Item[]): void;
   historyStart(start: number): void; // items before `start` were deleted on the computer
   historySettings(days: number | null): void;
-  memories(items: { id: string; text: string }[]): void;
+  memories(items: { id: string; text: string }[], topics: { id: string; title: string; text: string; ts: number }[]): void;
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   browser(sites: BrowserSite[]): void;
   connections(emails: string[]): void; // every connected account (SPEC §3.4 "Connections")
@@ -438,7 +438,7 @@ export class Client {
         this.on.history((msg.items ?? []) as Item[]);
         break;
       case "memories":
-        this.on.memories(msg.items ?? []);
+        this.on.memories(msg.items ?? [], Array.isArray(msg.topics) ? msg.topics : []);
         break;
       case "devices":
         this.on.devices(msg.items ?? []);

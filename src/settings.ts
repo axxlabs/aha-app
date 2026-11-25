@@ -4,12 +4,11 @@
 import { APPEARANCES, THEMES, applyTheme } from "./themes";
 import { APP_VERSION, type BrowserSite, type Client, HISTORY_CHOICES, type ModelChoice, shortFingerprint } from "./client";
 import { DATE_FORMATS, formatDate } from "./markdown";
-import { BUILD, ICONS, h, icon } from "./dom";
+import { BUILD, ICONS, h, icon, openSheet } from "./dom";
 import { b64urlDecode } from "./crypto";
 import type { Store } from "./store";
 export interface SettingsUi {
   showHistory(days: number | null): void;
-  showMemories(list: { id: string; text: string }[]): void;
   showDevices(list: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   showBrowser(list: BrowserSite[]): void;
   showConnections(emails: string[]): void;
@@ -97,11 +96,8 @@ function reportView(client: Client, back: () => void) {
   };
 }
 
-const PANE_MEDIA = "(min-width: 1400px)"; // 30% of it is at least the sheet's 420px; keep in step with style.css
-
 export function openSettings(store: Store, client: Client, onClose: () => void): SettingsUi {
   const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
-  const memories = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
   const devices = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
   // Your browser (SPEC §3.4, §7.4): what Aha!'s browser on the computer remembers for this person.
   const sites = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
@@ -192,14 +188,10 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
     swatches.append(b);
   }
   let report: ReturnType<typeof reportView> | null = null;
-  const dialog = h(
-    "dialog",
-    { class: "sheet", "aria-label": "Settings" },
-    h(
+  const content = h(
       "div",
       { class: "sheet-in" },
       h("header", {}, h("h2", {}, "Settings"), close),
-      h("section", {}, h("h4", {}, "What Aha! remembers about you"), memories, h("p", { class: "fine" }, "To change something, just tell Aha! in the chat.")),
       h(
         "section",
         {},
@@ -262,35 +254,9 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
         ),
       ),
       h("p", { class: "fine" }, `Aha! ${APP_VERSION} (${BUILD}) · end-to-end encrypted (AHA-PQ v1) · `, h("a", { href: "https://github.com/axxlabs/aha-app", target: "_blank", rel: "noopener noreferrer" }, "source (AGPL-3.0)")),
-    ),
-  ) as HTMLDialogElement;
-  document.body.append(dialog);
-  // On a wide screen Settings is a pane beside the chat, which stays usable; on a narrow one, a sheet over it.
-  const wide = matchMedia(PANE_MEDIA);
-  const place = () => {
-    if (dialog.open) dialog.close();
-    document.body.classList.toggle("with-pane", wide.matches);
-    if (wide.matches) dialog.show();
-    else dialog.showModal();
-  };
-  place();
-  wide.addEventListener("change", place);
-  const shut = () => {
-    wide.removeEventListener("change", place);
-    document.body.classList.remove("with-pane");
-    dialog.close();
-    dialog.remove();
-    onClose();
-  };
+    );
+  const { dialog, shut } = openSheet("Settings", content, onClose);
   close.onclick = shut;
-  dialog.addEventListener("cancel", (e) => {
-    e.preventDefault();
-    shut();
-  });
-  dialog.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !dialog.matches(":modal")) shut();
-  });
-  void client.send({ t: "memories_request" });
   void client.send({ t: "history_settings_request" });
   void client.send({ t: "devices_request" });
   void client.send({ t: "browser_request" });
@@ -417,21 +383,6 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
     },
     onReport(msg) {
       report?.onReport(msg);
-    },
-    showMemories(list) {
-      memories.replaceChildren(
-        ...(list.length
-          ? list.map((m) => {
-              const forget = h("button", { class: "btn", type: "button" }, "Forget");
-              forget.onclick = async () => {
-                if (!confirm(`Forget “${m.text}”?`)) return;
-                forget.setAttribute("disabled", "");
-                if (!(await client.send({ t: "memory_forget", id: m.id }))) forget.removeAttribute("disabled");
-              };
-              return h("div", { class: "row" }, h("span", {}, m.text), forget);
-            })
-          : [h("p", { class: "fine" }, "Nothing yet.")]),
-      );
     },
     browserNote(text) {
       siteNote.textContent = text;

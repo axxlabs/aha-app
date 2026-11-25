@@ -30,7 +30,7 @@ a { color: inherit; text-underline-offset: 3px; }
 .status .lock { color: var(--muted); }
 .icon-btn { border: 1px solid var(--line); background: var(--card); border-radius: 999px; width: 38px; height: 38px;
   display: inline-flex; align-items: center; justify-content: center; }
-.right { display: flex; align-items: center; gap: 12px; }
+.right { display: flex; align-items: center; gap: 8px; }
 
 .banner { margin: 10px auto 0; max-width: 760px; width: calc(100% - 32px); padding: 9px 14px; border-radius: 12px;
   background: var(--accent-soft); font-size: 14px; }
@@ -225,3 +225,22 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .row.col-row .segmented { grid-template-columns: repeat(2, 1fr); }
 .note-box { border: 1.5px solid var(--line); background: var(--card); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
 .note-box p { margin: 0; }
+/* Memory (memory.ts, SPEC §7.4): facts as soft chips, each topic as a card with its date. */
+.memory .facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.memory .fact { display: inline-flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 999px;
+  background: var(--soft); border: 1px solid var(--line); font-size: 14px; }
+.memory .topics { display: flex; flex-direction: column; gap: 10px; }
+.memory .topics-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.memory .topics-head h4 small { font-weight: 700; color: var(--muted); margin-left: 4px; }
+.memory .topics-head input { flex: 0 1 180px; min-width: 0; font: inherit; font-size: 14px; padding: 6px 10px;
+  border: 1.5px solid var(--line); border-radius: 999px; background: var(--card); color: inherit; }
+.memory .topic { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 12px 12px 12px 14px; }
+.memory .topic header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.memory .topic header div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.memory .topic b { font-size: 15px; overflow-wrap: anywhere; }
+.memory .topic time { font-size: 12px; color: var(--muted); }
+.memory .topic p { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; color: var(--ink); }
+.memory .forget { flex: none; border: 0; background: transparent; color: var(--muted); width: 28px; height: 28px;
+  border-radius: 999px; display: grid; place-items: center; cursor: pointer; }
+.memory .forget:hover { background: var(--soft); color: var(--ink); }
+.memory .forget svg { width: 14px; height: 14px; }

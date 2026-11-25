@@ -17,8 +17,9 @@ describe("tasks panel", () => {
     const when = () => "14:35";
     expect(nextWords({ next: 2000 }, 1000, when)).toBe("Next check 14:35");
     expect(nextWords({ next: 900 }, 1000, when)).toBe("At the next idle time");
-    expect(nextWords({ next: 2000, now: true }, 1000, when)).toBe("As soon as Aha! is free");
-    expect(nextWords({ next: 2000, running: true }, 1000, when)).toBe("Checking now");
+    expect(nextWords({ next: 2000, now: true }, 1000, when)).toBe("As soon as Aha! is free · then 14:35");
+    expect(nextWords({ next: 2000, running: true }, 1000, when)).toBe("Checking now · then 14:35");
+    expect(nextWords({ next: 900, running: true }, 1000, when)).toBe("Checking now");
   });
 
   it("says how the last check ended", () => {

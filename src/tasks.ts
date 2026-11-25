@@ -45,9 +45,12 @@ export function everyWords(seconds: number): string {
 
 /** The panel's "Next" line for a task. */
 export function nextWords(t: Pick<BackgroundTask, "next" | "now" | "running">, now: number, when: (epoch: number) => string): string {
-  if (t.running) return "Checking now";
-  if (t.now) return "As soon as Aha! is free";
-  return t.next <= now ? "At the next idle time" : `Next check ${when(t.next)}`;
+  const planned = t.next <= now ? "At the next idle time" : `Next check ${when(t.next)}`;
+  // Run now is an extra check: the planned one keeps its time, said beside it.
+  const then = t.next <= now ? "" : ` · then ${when(t.next)}`;
+  if (t.running) return `Checking now${then}`;
+  if (t.now) return `As soon as Aha! is free${then}`;
+  return planned;
 }
 
 /** How the last check ended, beside "Last check" ("" for a plain WAITING). */

@@ -244,3 +244,5 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
   border-radius: 999px; display: grid; place-items: center; cursor: pointer; }
 .memory .forget:hover { background: var(--soft); color: var(--ink); }
 .memory .forget svg { width: 14px; height: 14px; }
+/* What Aha! used for an answer (SPEC §7.4 "Tools used"): side info, not part of the reply. */
+.aha .tools-used { font-size: 12px; color: var(--muted); margin-bottom: 4px; letter-spacing: .1px; }

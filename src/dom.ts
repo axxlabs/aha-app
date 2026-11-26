@@ -64,9 +64,24 @@ export function infoPopup(content: string | Node, label: string, kind: "info" | 
     if (open) document.addEventListener("pointerdown", outside, true);
     else document.removeEventListener("pointerdown", outside, true);
   };
+  // Opens downward, or upward when there's no room below: the chat's own area clips it (the input box under it,
+  // the last topic's popup hidden behind it).
+  const place = () =>
+    requestAnimationFrame(() => {
+      tip.classList.remove("up");
+      const box = tip.getBoundingClientRect();
+      if (!box.height) return; // not shown
+      const area = (info.closest("main") ?? document.documentElement).getBoundingClientRect();
+      const bottom = Math.min(area.bottom, window.innerHeight);
+      const above = info.getBoundingClientRect().top - Math.max(area.top, 0);
+      if (box.bottom > bottom - 4 && above > box.height + 8) tip.classList.add("up");
+    });
+  info.addEventListener("pointerenter", place);
+  info.addEventListener("focus", place);
   info.onclick = (e) => {
     e.stopPropagation();
     pin(info.getAttribute("aria-expanded") !== "true");
+    place();
   };
   info.onkeydown = (e) => {
     e.stopPropagation();

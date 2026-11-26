@@ -23,6 +23,22 @@ export interface BackgroundTask {
   last_how?: string; // how the last check ended: waiting | notify | unfinished | interrupted
   card?: string; // the card that started it: the topic it came from (SPEC §7.4 "Folding")
   allowed?: string[]; // what the person allowed up front when it was started: its checks keep it (SPEC §3.4)
+  grant?: Grant; // the same, to edit (SPEC §7.4)
+}
+/** What a task may do without asking, each read apart from its write (SPEC §5.2 "Allowed up front"). */
+export interface Grant {
+  open: string[]; // sites whose pages it reads
+  type: string[]; // sites it types on (and opens)
+  search: boolean;
+  email: string[]; // people it may send email to, or invite
+  drafts: boolean;
+  calendar_add: boolean;
+  calendar_change: boolean;
+}
+
+/** "fedex.com, royalmail.com" → ["fedex.com", "royalmail.com"]: commas, spaces or new lines between. */
+export function listOf(text: string): string[] {
+  return [...new Set(text.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean))];
 }
 export interface TasksState {
   items: BackgroundTask[];
@@ -198,6 +214,32 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
       noEnd.checked = t.until === null;
       until.disabled = noEnd.checked;
       noEnd.onchange = () => (until.disabled = noEnd.checked);
+      // What it may do without asking (SPEC §7.4): the person changes it here, their own action, so no card.
+      const g: Grant = { open: [], type: [], search: false, email: [], drafts: false, calendar_add: false, calendar_change: false, ...t.grant };
+      const types = h("input", { type: "text", value: g.type.join(", "), placeholder: "fedex.com, royalmail.com", autocapitalize: "off" }) as HTMLInputElement;
+      const opens = h("input", { type: "text", value: g.open.join(", "), placeholder: "Sites", autocapitalize: "off" }) as HTMLInputElement;
+      const people = h("input", { type: "text", value: g.email.join(", "), placeholder: "Email addresses", autocapitalize: "off" }) as HTMLInputElement;
+      const tick = (on: boolean, words: string) => {
+        const box = h("input", { type: "checkbox" }) as HTMLInputElement;
+        box.checked = on;
+        return [box, h("label", { class: "check" }, box, h("span", {}, words))] as const;
+      };
+      const [search, searchRow] = tick(g.search, "Search the web, even after reading your email or private pages");
+      const [drafts, draftsRow] = tick(g.drafts, "Save email drafts in your mailbox (nothing is sent)");
+      const [adds, addsRow] = tick(g.calendar_add, "Add new events to your calendar");
+      const [changes, changesRow] = tick(g.calendar_change, "Change events already in your calendar");
+      const allowed = h(
+        "fieldset",
+        { class: "task-allowed" },
+        h("legend", {}, "Allowed without asking"),
+        field("Type and fill in forms on (sites)", types),
+        field("Open pages on, read only (sites)", opens),
+        field("Send email to", people),
+        searchRow,
+        draftsRow,
+        addsRow,
+        changesRow,
+      );
       const error = h("p", { class: "fine error", hidden: "" });
       const save = h("button", { class: "run", type: "button" }, "Save");
       const back = h("button", { class: "run quiet", type: "button" }, "Cancel");
@@ -208,6 +250,7 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
         field("How it checks", box),
         h("div", { class: "task-edit-row" }, field("Check every (minutes)", every), field("Next check", nextAt)),
         h("div", { class: "task-edit-row" }, field("Until", until), h("label", { class: "check" }, noEnd, h("span", {}, "No end"))),
+        allowed,
         error,
         h("div", { class: "task-edit-actions" }, back, save),
       );
@@ -239,7 +282,16 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
         error.hidden = !why;
         if (why) return;
         save.setAttribute("disabled", "");
-        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), every: Math.round(minutes) * 60, next, until: end });
+        const grant: Grant = {
+          open: listOf(opens.value),
+          type: listOf(types.value),
+          search: search.checked,
+          email: listOf(people.value),
+          drafts: drafts.checked,
+          calendar_add: adds.checked,
+          calendar_change: changes.checked,
+        };
+        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), every: Math.round(minutes) * 60, next, until: end, grant });
         if (sent) done(); // the computer sends the new list
         else save.removeAttribute("disabled");
       };

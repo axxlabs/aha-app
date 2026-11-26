@@ -304,6 +304,10 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .tasks .task dt { color: var(--muted); }
 .tasks .task dd { margin: 0; }
 .tasks .task ul.allowed { margin: 0; padding-left: 16px; }
+/* The task's permissions in its editor (SPEC §7.4): three lists of sites or people, and ticks. */
+.task-allowed { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px 10px; margin: 4px 0 0; display: grid; gap: 8px; min-width: 0; }
+.task-allowed legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.tasks .task-allowed label.check { align-self: start; padding-bottom: 0; }
 .tasks .task .last { margin: 8px 0 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
 .tasks .task .last small { display: block; font-size: 12px; color: var(--muted); }
 .tasks .task details { margin-top: 8px; font-size: 13px; flex: 1; min-width: 0; }

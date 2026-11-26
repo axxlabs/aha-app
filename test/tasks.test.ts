@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Axxlabs Limited
 // The Tasks panel's words (SPEC §7.4): how often, how long idle.
 import { describe, expect, it } from "vitest";
-import { countWords, everyWords, fromLocalInput, idleLine, idleWords, lastHow, nextWords, runningCards, startedMarks, toLocalInput } from "../src/tasks";
+import { countWords, everyWords, fromLocalInput, idleLine, idleWords, lastHow, listOf, nextWords, runningCards, startedMarks, toLocalInput } from "../src/tasks";
 
 describe("tasks panel", () => {
   it("says how often a task checks", () => {
@@ -73,5 +73,12 @@ describe("a topic's started tasks", () => {
     expect(ids(runningCards(cards, states, [{ created: 2030 }, { created: 2040 }]))).toEqual(["b", "d"]); // c was declined
     expect(ids(runningCards(cards, states, [{ card: "e", created: 3010 }, { created: 3020 }]))).toEqual(["d", "e"]);
     expect(runningCards(cards, states, [{ created: 3000 + 7 * 3600 }])?.size).toBe(0);
+  });
+});
+
+describe("a task's permissions in its editor", () => {
+  it("reads a list of sites or people, however it's separated", () => {
+    expect(listOf(" fedex.com, royalmail.com\nfedex.com ;dpd.co.uk ")).toEqual(["fedex.com", "royalmail.com", "dpd.co.uk"]);
+    expect(listOf("  ")).toEqual([]);
   });
 });

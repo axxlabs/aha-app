@@ -374,8 +374,15 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .steps.live .steps-toggle b::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent, currentColor); animation: steps-pulse 1.2s ease-in-out infinite; vertical-align: middle; }
 @keyframes steps-pulse { 50% { opacity: .25; } }
 .steps-body { margin: 6px 0 8px 4px; color: var(--fg, inherit); font-size: 13px; }
-/* Live diagnostics (SPEC §7.4): between "home · online" and the buttons */
-.stats { display: flex; flex-direction: column; align-items: flex-end; font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); white-space: nowrap; }
+/* Live diagnostics (SPEC §7.4): between "home · online" and the buttons; one small chip each, coloured by level */
+.stats { display: flex; gap: 8px; align-items: center; font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); white-space: nowrap; }
+.stats .chip { display: inline-flex; gap: 4px; align-items: center; }
+.stats .chip b { font-weight: 700; letter-spacing: .02em; }
+.stats .bar { width: 22px; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; display: inline-block; }
+.stats .bar i { display: block; height: 100%; border-radius: 3px; transition: width .6s; }
+.stats .ok { --lv: var(--ok); } .stats .warn { --lv: var(--accent); } .stats .hot { --lv: #D92D20; }
+.stats .bar i { background: var(--lv); }
+.stats .temp { color: var(--lv); }
 @media (max-width: 640px) { .stats { display: none; } }
 .tool-use { font-size: 12px; color: var(--muted); margin: -2px 0 2px; padding-left: 2px; }
 .tool-use::before { content: "↳ "; opacity: .7; }

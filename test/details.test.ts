@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { Client, TraceEvent } from "../src/client";
 import { stats } from "../src/client";
 import { detailsLines, stepsSummary } from "../src/details";
-import { statsLines } from "../src/stats";
+import { loadLevel, statsChips, statsPanel, tempLevel } from "../src/stats";
 
 const ev = (ts: string, kind: string, extra: Record<string, unknown> = {}) => ({ ts, kind, ...extra }) as TraceEvent;
 const model = (ts: string, label = "") => ev(ts, "model", { model: "m", text: "", calls: label ? [{ name: "x", args: "{}", label }] : [] });
@@ -56,10 +56,23 @@ describe("Details line (SPEC §7.4)", () => {
 });
 
 describe("Live diagnostics (SPEC §7.4)", () => {
-  it("shows what the computer could read", () => {
-    const s = stats({ t: "stats", cpu: { load: 23, temp: 54 }, mem: { used: 31.4, total: 125.7 }, gpu: { load: 60, temp: 55, mem: 14.1, mem_total: 15.9 } });
-    expect(statsLines(s)).toEqual(["CPU 23% · 54°C · RAM 31.4/126 GB", "GPU 60% · 55°C · 14.1/15.9 GB"]);
-    expect(statsLines(stats({ t: "stats", mem: { used: 2, total: 8 } }))).toEqual(["RAM 2.0/8.0 GB"]);
-    expect(statsLines(stats({ t: "stats", cpu: { load: "x" }, gpu: { load: 1 } }))).toEqual([]); // not numbers: left out
+  it("one small chip per part, with the numbers in full on hover", () => {
+    const s = stats({ t: "stats", cpu: { load: 23, temp: 54 }, mem: { used: 31.4, total: 125.7 }, gpu: { load: 91, temp: 78, mem: 14.1, mem_total: 15.9 } });
+    expect(statsChips(s)).toEqual([
+      { label: "CPU", load: 23, temp: 54, title: "CPU 23% · 54°C" },
+      { label: "RAM", load: 25, title: "RAM 31.4 of 126 GB" },
+      { label: "GPU", load: 91, temp: 78, title: "GPU 91% · 78°C · VRAM 14.1 of 15.9 GB" },
+    ]);
+    expect(statsChips(stats({ t: "stats", cpu: { load: "x" }, gpu: { load: 1 } }))).toEqual([]); // not numbers: left out
+  });
+
+  it("colours by level", () => {
+    expect([loadLevel(23), loadLevel(60), loadLevel(91)]).toEqual(["ok", "warn", "hot"]);
+    expect([tempLevel(54), tempLevel(78), tempLevel(88)]).toEqual(["ok", "warn", "hot"]);
+    const p = statsPanel();
+    p.show(stats({ t: "stats", gpu: { load: 91, temp: 78, mem: 1, mem_total: 2 } }));
+    expect(p.el.querySelector(".bar")?.className).toBe("bar hot");
+    expect(p.el.querySelector(".temp")?.className).toBe("temp warn");
+    expect(p.el.textContent).toBe("GPU78°");
   });
 });

@@ -415,3 +415,4 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .stats .bar i { background: var(--lv); }
 .stats .temp { color: var(--lv); }
 @media (max-width: 640px) { .stats { display: none; } }
+.tail { display: flex; flex-direction: column; gap: 6px; }

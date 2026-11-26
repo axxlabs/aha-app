@@ -258,10 +258,11 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   let busy = false;
   let historyStart = 1; // the first message the computer still holds (SPEC §3.8.1)
   // The chat view (src/view.ts): the items are its only state, and it draws everything from them.
+  const acts = actionBoxes(); // each request's "what Aha! did" box (SPEC §7.4)
   const view = chatView({
     col,
     scroller,
-    working,
+    working: h("div", { class: "tail" }, acts.live, working), // what Aha! did, growing, then "working…"
     node,
     resolve: (it, st) => applyState(String(it.id), st),
     dayLabel,
@@ -317,7 +318,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   function watchStats(): void {
     if (client?.computer) void client.send({ t: "stats_watch", on: document.visibilityState === "visible" });
   }
-  const acts = actionBoxes(); // each request's "what Aha! did" box (SPEC §7.4)
   let details: ReturnType<typeof detailsLines> | null = null; // each request's Details line (SPEC §7.4); made with the client
   // The person's connected accounts, shown as labels in replies (SPEC §7.4 "Labels"); asked once online.
   let accounts: string[] = [];
@@ -353,11 +353,11 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
       const run = typeof it.run === "string" ? it.run : "";
       if (run) {
-        // A request's answer (SPEC §7.4): what it did is in its box where the work started (filled again here,
-        // after a reload), and its Details line comes after the answer, closed, one click to open.
-        acts.fill(run, it.record);
+        // A request's answer (SPEC §7.4): what it did right above it (it grew there while the request worked),
+        // and its Details line after it, closed, one click to open.
+        acts.done(run, it.record);
         const tail = details ? [details.line(it.seq, run)] : [];
-        return text.trim() || img ? h("div", { class: "aha-turn" }, el, ...tail) : h("div", { class: "aha-turn" }, ...tail);
+        return h("div", { class: "aha-turn" }, acts.box(run), ...(text.trim() || img ? [el] : []), ...tail);
       }
       // A background task's note, or an answer from before boxes: the receipt, drawn apart from the model's words.
       const done = receiptLines(it.record);
@@ -378,8 +378,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     }
     if (it.t === "approval") return approvalCard(it);
     // A request's Details line (SPEC §7.4 "Details"): what the model is doing, live, closed until opened.
-    // Where a request's work starts: what Aha! did, filled as it happens (SPEC §7.4 "What Aha! did").
-    if (it.t === "steps") return acts.box(typeof it.task === "string" ? it.task : "");
+    // Where a request's work starts: nothing shows there; what it did grows above its answer (SPEC §7.4).
+    if (it.t === "steps") return null;
     // A tool line from before Details lines: side info, not part of a reply.
     return null;
   }

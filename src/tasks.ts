@@ -21,7 +21,7 @@ export interface BackgroundTask {
   created: number;
   now?: boolean; // Run now was asked: it checks as soon as the model is free
   running?: boolean; // a check of it runs now
-  last_how?: string; // how the last check ended: waiting | notify | unfinished | interrupted
+  last_how?: string; // how the last check ended: waiting | notify | ended_early
   card?: string; // the card that started it: the topic it came from (SPEC §7.4 "Folding")
   allowed?: string[]; // what the person allowed up front when it was started: its checks keep it (SPEC §3.4)
   grant?: Grant; // the same, to edit (SPEC §7.4)
@@ -119,7 +119,7 @@ export function nextWords(t: Pick<BackgroundTask, "next" | "now" | "running">, n
 
 /** How the last check ended, beside "Last check" ("" for a plain waiting). */
 export function lastHow(how: string | undefined): string {
-  return { notify: " · sent to you", unfinished: " · didn't finish", interrupted: " · stopped early" }[how ?? ""] ?? "";
+  return { notify: " · sent to you", ended_early: " · ended early" }[how ?? ""] ?? "";
 }
 
 /** "3 checks so far", "5 checks, 2 updates sent". */

@@ -33,7 +33,7 @@ describe("tasks panel", () => {
   it("says how the last check ended", () => {
     expect(lastHow("waiting")).toBe("");
     expect(lastHow("notify")).toBe(" · sent to you");
-    expect(lastHow("interrupted")).toBe(" · stopped early");
+    expect(lastHow("ended_early")).toBe(" · ended early");
     expect(lastHow(undefined)).toBe("");
   });
 

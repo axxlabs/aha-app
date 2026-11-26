@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
-// Folding the chat after a break (SPEC §7.4 "Folding"). The same rule as the computer's aha_local/folding.py (the
-// break is checked against test/vectors/device_messages.json on both sides):
-// a break is two hours without a message, or a new day; a new subject starts a part of its own, and so does a
-// cut (the person's [collapse]: everything before it folds at once). Each part before a break folds into one grey line with
+// Folding the chat (SPEC §7.4 "Folding"). The app's own view: a break is two hours without a message, or a new
+// day. A new subject the computer marked starts a part of its own, and so does a cut (the person's [collapse]:
+// everything before it folds at once). Each part before a break folds into one grey line with
 // its title; what's unfinished stays open; the part still going on doesn't fold and has no title.
 import { type DateFormat, formatDate } from "./markdown";
 import type { Item } from "./store";
@@ -49,6 +48,8 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
   const titles = items.filter((it) => it.t === "title");
   // A new subject starts a part too: the computer marks the message where it starts (SPEC §7.4).
   const topics = new Set(titles.filter((t) => t.new === true).map((t) => Number(t.from)));
+  // Aha!'s messages that wait for your reply, as the computer said after each request (SPEC §7.4).
+  const waiting = new Set(titles.filter((t) => typeof t.waiting === "number").map((t) => Number(t.waiting)));
   const cuts = items.filter((it) => it.t === "cut").map((it) => it.seq);
   const cutBetween = (a: number, b: number) => cuts.some((c) => c > a && c < b);
   const lastMine = Math.max(0, ...chat.filter((it) => it.role === "me").map((it) => it.seq));
@@ -72,7 +73,7 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
       const unfinished =
         (it.t === "approval" && !resolved.has(String(it.id))) || // a card waiting for you
         (it.t === "msg" && it.open === "stopped" && it.seq > lastMine) || // stopped, and you haven't written since
-        (it.t === "msg" && it.open === "asks" && it.seq > lastMine); // a question you haven't answered
+        (it.t === "msg" && waiting.has(it.seq) && it.seq > lastMine); // waits for your reply, and you haven't written
       if (!unfinished) return;
       open.add(it.seq);
       const before = part[k - 1]; // what you asked, so the open item makes sense on its own

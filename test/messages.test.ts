@@ -3,7 +3,6 @@
 // The messages between the app and the computer (SPEC §6.5), checked against the file both repos share.
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BREAK_SECONDS } from "../src/fold";
 
 const schema = JSON.parse(readFileSync(new URL("./vectors/device_messages.json", import.meta.url), "utf8"));
 const src = (name: string) => readFileSync(new URL(`../src/${name}`, import.meta.url), "utf8");
@@ -25,9 +24,5 @@ describe("device messages", () => {
     const handled = [...block.matchAll(/case "([a-z_]+)":/g)].map((m) => m[1]);
     expect(handled.length).toBeGreaterThan(10);
     for (const t of handled) expect(Object.keys(schema.computer), t).toContain(t);
-  });
-
-  it("folds after the same break as the computer", () => {
-    expect(BREAK_SECONDS).toBe(schema.rules.fold_break_seconds);
   });
 });

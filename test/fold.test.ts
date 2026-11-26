@@ -40,17 +40,19 @@ describe("folding after a break (SPEC §7.4)", () => {
     n = 0;
     const ask = me(T, "book Flat Iron");
     const card = { seq: ++n, ts: T + min, t: "approval", id: "a1" } as Item;
-    const q = aha(T + 2 * min, "Which time?", "asks");
+    const q = aha(T + 2 * min, "Which time?");
+    const waits = { seq: ++n, ts: T + 2 * min, t: "title", from: ask.seq, text: "Flat Iron", waiting: q.seq } as Item;
     const later = T + 5 * 60 * min;
-    let [p] = plan([ask, card, q], new Set(), later);
+    let [p] = plan([ask, card, q, waits], new Set(), later);
     expect(p.folded && [...p.open].sort()).toEqual([ask.seq, card.seq, q.seq].sort());
-    [p] = plan([ask, card, q], new Set(["a1"]), later); // the card was answered
+    [p] = plan([ask, card, q, waits], new Set(["a1"]), later); // the card was answered
     expect([...p.open]).toEqual([q.seq]);
+    expect(plan([ask, card, q], new Set(["a1"]), later)[0].open.size).toBe(0); // a "?" alone isn't waiting
     const reply = me(T + 3 * min, "8pm");
-    [p] = plan([ask, card, q, reply], new Set(["a1"]), later); // the question was answered
+    [p] = plan([ask, card, q, waits, reply], new Set(["a1"]), later); // the question was answered
     expect(p.open.size).toBe(0);
     const stopped = aha(T + 4 * min, "Aha! is restarting…", "stopped");
-    [p] = plan([ask, card, q, reply, stopped], new Set(["a1"]), later);
+    [p] = plan([ask, card, q, waits, reply, stopped], new Set(["a1"]), later);
     expect([...p.open].sort()).toEqual([reply.seq, stopped.seq].sort()); // with what it was doing
   });
 

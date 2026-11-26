@@ -209,9 +209,8 @@ export function pair(data: PairData, deviceName = defaultDeviceName()): Promise<
 /** A site the person's browser on the computer remembers (SPEC §3.4, Settings → Your browser). */
 export interface BrowserSite {
   site: string;
-  signed_in: boolean;
   trusted: boolean; // acts there without asking (SPEC §5.7)
-  login_saved?: boolean; // a login saved on a login card (SPEC §5.8)
+  login_saved: boolean; // a login saved on a login card (SPEC §5.8)
 }
 
 /** A model the computer can run (SPEC §3.2, Settings → Model). */
@@ -278,7 +277,7 @@ export function browserSites(raw: unknown): BrowserSite[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((s): s is BrowserSite => !!s && typeof s.site === "string" && s.site.length <= 255)
-    .map((s) => ({ site: s.site, signed_in: s.signed_in === true, trusted: s.trusted === true }));
+    .map((s) => ({ site: s.site, trusted: s.trusted === true, login_saved: s.login_saved === true }));
 }
 
 export interface Events {

@@ -7,7 +7,10 @@
 import MarkdownIt from "markdown-it";
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true, typographer: false });
-md.disable(["image", "heading", "lheading"]);
+md.disable(["image", "lheading"]);
+// A heading reads as a bold line in a chat bubble, not a page title (the computer leaves the model's words alone).
+md.renderer.rules.heading_open = () => "<p><strong>";
+md.renderer.rules.heading_close = () => "</strong></p>\n";
 
 const SAFE_LINK = /^(https?:|mailto:)/i;
 md.validateLink = (url: string) => SAFE_LINK.test(url.trim());

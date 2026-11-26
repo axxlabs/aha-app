@@ -434,7 +434,6 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
                   login.disabled = false;
                 }
               };
-              const tags = [s.signed_in ? "signed in" : ""].filter(Boolean);
               // Trusted (SPEC §5.7): Aha! acts on this site without asking.
               const trust = h("input", { type: "checkbox", "aria-label": `Trust ${s.site}` }) as HTMLInputElement;
               trust.checked = s.trusted;
@@ -448,7 +447,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
               return h(
                 "div",
                 { class: "row" },
-                h("span", {}, s.site, ...(tags.length ? [h("small", {}, tags.join(" · "))] : [])),
+                h("span", {}, s.site),
                 h("span", { class: "site-actions" }, h("label", { class: "trust" }, trust, "Trusted"), ...(s.login_saved ? [h("label", { class: "trust" }, login, "Login saved")] : []), forget),
               );
             })

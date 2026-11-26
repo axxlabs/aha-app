@@ -364,7 +364,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     // A request's Details line (SPEC §7.4 "Details"): what the model is doing, live, closed until opened.
     if (it.t === "steps" && details) return details.line(it.seq, typeof it.task === "string" ? it.task : "");
     // A tool line from before Details lines: side info, not part of a reply.
-    if (it.t === "tool" && typeof it.label === "string") return h("div", { class: "tool-use" }, `Used ${it.label}`);
     return null;
   }
 

@@ -21,8 +21,10 @@ describe("markdown", () => {
     expect(html).toContain("&lt;script&gt;");
   });
 
-  it("turns headings into plain text", () => {
-    expect(render("## Hello")).not.toContain("<h2");
+  it("shows a heading as a bold line, not a page title", () => {
+    const html = render("## Hours\nOpen 10:00");
+    expect(html).not.toContain("<h2");
+    expect(html).toContain("<p><strong>Hours</strong></p>");
   });
 
   it("tags every email address, the person's own in their own colour", () => {

@@ -3,7 +3,7 @@
 // The chat view (SPEC §7.4). `items` is the only state; draw() derives everything shown from it: the parts of the
 // chat and their fold lines, day labels, what stays open, and what's being sent. Each item's element is made once
 // and kept, so a card keeps what's typed in it. Everything else only changes the state and calls invalidate().
-import { type Part, foldTime, plan } from "./fold";
+import { type Part, foldTime, plan, shown } from "./fold";
 import type { Item } from "./store";
 
 export interface ViewDeps {
@@ -22,7 +22,6 @@ export interface ViewDeps {
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
 }
 
-const shown = (it: Item) => it.t === "msg" || it.t === "approval" || it.t === "tool";
 
 export function chatView(d: ViewDeps) {
   const items = new Map<number, Item>();

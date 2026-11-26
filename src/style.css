@@ -257,13 +257,6 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .trust { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
 .trust input { width: 18px; height: 18px; accent-color: var(--accent, currentColor); }
 /* ⋯ under Aha!'s messages, and a message's details (SPEC §3.8) */
-.more-wrap { position: relative; display: flex; justify-content: flex-start; margin-top: 2px; }
-.more { border: 0; background: none; color: var(--muted); padding: 2px 6px; border-radius: 8px; opacity: .55; display: inline-flex; }
-.more:hover, .more[aria-expanded="true"] { opacity: 1; background: var(--soft); }
-.more-menu { position: absolute; top: 100%; left: 0; z-index: 5; background: var(--card); border: 1px solid var(--line);
-  border-radius: 12px; padding: 4px; box-shadow: 0 6px 24px rgba(0,0,0,.14); }
-.more-menu button { border: 0; background: none; color: inherit; font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 8px; white-space: nowrap; }
-.more-menu button:hover { background: var(--soft); }
 .trace { display: flex; flex-direction: column; gap: 12px; }
 .trace-row { display: flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--line); padding-left: 10px; }
 .trace-head { display: flex; gap: 8px; align-items: baseline; }
@@ -364,5 +357,18 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .task-note .aha > :first-child { margin-top: 0; }
 .task-note .aha > :last-child { margin-bottom: 0; }
 /* A tool Aha! used (SPEC §7.4 "Tools used"): small side info between the messages, not a reply. */
+/* A request's Details line (SPEC §7.4 "Details"): small, under the request, closed until opened; live while it works */
+.steps { margin: -2px 0 2px; font-size: 12px; color: var(--muted); }
+.steps-toggle { border: 0; background: none; color: inherit; font: inherit; padding: 2px 6px 2px 2px; border-radius: 8px; display: inline-flex; gap: 6px; align-items: baseline; text-align: left; cursor: pointer; }
+.steps-toggle:hover, .steps-toggle:focus-visible { background: var(--soft); }
+.steps-toggle b { font-weight: 600; }
+.steps-toggle .chev { display: inline-block; font-size: 13px; line-height: 1; transition: transform .15s; }
+.steps-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.steps.live .steps-toggle b::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent, currentColor); animation: steps-pulse 1.2s ease-in-out infinite; vertical-align: middle; }
+@keyframes steps-pulse { 50% { opacity: .25; } }
+.steps-body { margin: 6px 0 8px 4px; color: var(--fg, inherit); font-size: 13px; }
+/* Live diagnostics (SPEC §7.4): between "home · online" and the buttons */
+.stats { display: flex; flex-direction: column; align-items: flex-end; font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); white-space: nowrap; }
+@media (max-width: 640px) { .stats { display: none; } }
 .tool-use { font-size: 12px; color: var(--muted); margin: -2px 0 2px; padding-left: 2px; }
 .tool-use::before { content: "↳ "; opacity: .7; }

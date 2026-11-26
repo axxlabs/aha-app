@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
-// A message's ⋯ → Details (SPEC §3.8): what the model wrote, thought and called, with times.
+// Each request's Details line (SPEC §7.4 "Details"): what the model wrote, thought and called, live, with times.
 import { type Client, type TraceEvent, traceTime } from "./client";
-import { ICONS, h, icon } from "./dom";
+import { h } from "./dom";
 
 const CHECKS: Record<string, string> = {
   numbers: "a number it couldn't find on a page",
@@ -67,39 +67,87 @@ function traceRow(e: TraceEvent): HTMLElement {
   );
 }
 
-/** ⋯ → Show details: everything the model wrote and called for this message, with times. */
-export function openDetails(client: Client, seq: number, onClose: () => void) {
-  const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
-  const copy = h("button", { class: "btn", type: "button", hidden: "" }, "Copy all");
-  const body = h("div", { class: "trace" }, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline: details need it online."));
-  const dialog = h(
-    "dialog",
-    { class: "sheet", "aria-label": "Message details" },
-    h("div", { class: "sheet-in" }, h("header", {}, h("h2", {}, "Details"), close), h("p", { class: "fine" }, "What the model wrote, thought and called for this message, from your computer."), body, copy),
-  ) as HTMLDialogElement;
-  document.body.append(dialog);
-  dialog.showModal();
-  const shut = () => {
-    dialog.close();
-    dialog.remove();
-    onClose();
-  };
-  close.onclick = shut;
-  dialog.addEventListener("cancel", shut);
-  void client.send({ t: "trace_request", seq });
+const STEP_KINDS = new Set(["model", "tool", "check"]);
+const same = (a: TraceEvent, b: TraceEvent) => a.ts === b.ts && a.kind === b.kind && a.name === b.name && a.text === b.text;
+
+/** What a Details line says while closed: the tools it used, in the person's words, and how many steps. */
+export function stepsSummary(events: TraceEvent[]): string {
+  const labels: string[] = [];
+  for (const e of events) {
+    const names = e.kind === "tool" ? [e.label] : e.kind === "model" && Array.isArray(e.calls) ? (e.calls as { label?: unknown }[]).map((c) => c.label) : [];
+    for (const l of names) if (typeof l === "string" && l && !labels.includes(l)) labels.push(l);
+  }
+  const n = events.filter((e) => STEP_KINDS.has(e.kind)).length;
+  return [labels.join(", "), n ? `${n} step${n === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
+}
+
+/** Each request's Details line (SPEC §7.4 "Details"): one small expandable line where its work starts. Closed,
+ * it says what the model is doing; open, its records, live as they happen. Opened, the line asks the computer
+ * for the whole record so far (a reload or another device saw only part of it live), then adds what comes. */
+export function detailsLines(client: Client) {
+  const live = new Map<string, TraceEvent[]>(); // by task: the records that came live on this device
+  const lines = new Map<string, { add(e: TraceEvent): void; idle(): void }>(); // drawn lines, by task
+  const asked = new Map<number, (events: TraceEvent[]) => void>(); // trace requests, by the line's seq
+  let working = ""; // the task whose records are coming now
+
   return {
-    seq,
-    show(events: TraceEvent[]) {
-      if (!events.length) {
-        body.replaceChildren(h("p", { class: "fine" }, "No details were kept for this message. Messages from before this version, and ones not from a task, have none."));
-        return;
-      }
-      body.replaceChildren(...events.map(traceRow));
-      copy.hidden = false;
-      copy.onclick = async () => {
-        await navigator.clipboard.writeText(JSON.stringify(events, null, 1));
-        copy.textContent = "Copied";
+    /** A record as it happens. */
+    step(task: string, e: TraceEvent): void {
+      const list = live.get(task) ?? [];
+      list.push(e);
+      live.set(task, list);
+      const was = working;
+      working = task;
+      if (was && was !== task) lines.get(was)?.idle();
+      lines.get(task)?.add(e);
+    },
+    /** Aha! stopped working: no line is live any more. */
+    idle(): void {
+      const was = working;
+      working = "";
+      if (was) lines.get(was)?.idle();
+    },
+    trace(seq: number, events: TraceEvent[]): void {
+      asked.get(seq)?.(events);
+      asked.delete(seq);
+    },
+    line(seq: number, task: string): HTMLElement {
+      let events: TraceEvent[] = [...(live.get(task) ?? [])];
+      const summary = h("span", { class: "steps-sum" });
+      const toggle = h("button", { type: "button", class: "steps-toggle", "aria-expanded": "false" }, h("span", { class: "chev", "aria-hidden": "true" }, "›"), h("b", {}, "Details"), summary);
+      const body = h("div", { class: "steps-body trace", hidden: "" });
+      const el = h("div", { class: "steps" }, toggle, body);
+      const draw = () => {
+        summary.textContent = stepsSummary(events);
+        el.classList.toggle("live", working === task);
       };
+      const open = () => !body.hidden;
+      const shown = (list: TraceEvent[]) => body.replaceChildren(...(list.length ? list.map(traceRow) : [h("p", { class: "fine" }, "No details were kept for this request.")]));
+      toggle.onclick = () => {
+        body.hidden = open();
+        toggle.setAttribute("aria-expanded", String(open()));
+        if (!open()) return;
+        shown(events);
+        if (!client.computer) return;
+        asked.set(seq, (whole) => {
+          // The computer's record so far, then what came live since that it didn't have yet.
+          const later = events.filter((e) => !whole.some((w) => same(w, e)));
+          events = [...whole, ...later];
+          draw();
+          if (open()) shown(events);
+        });
+        void client.send({ t: "trace_request", seq });
+      };
+      lines.set(task, {
+        add(e) {
+          if (!events.some((x) => same(x, e))) events.push(e);
+          draw();
+          if (open()) body.append(traceRow(e));
+        },
+        idle: draw,
+      });
+      draw();
+      return el;
     },
   };
 }

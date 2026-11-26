@@ -5,12 +5,13 @@
 
 import "./style.css";
 import { applyTheme } from "./themes";
-import { APP_VERSION, Client, pruneCache, shortFingerprint, DEFAULT_SETTINGS, type TraceEvent, type Identity, type Settings, pair, parsePairLink } from "./client";
+import { APP_VERSION, Client, pruneCache, shortFingerprint, DEFAULT_SETTINGS, type Identity, type Settings, pair, parsePairLink } from "./client";
 import { type Tap, MAX_TAPS, checkButton, tapOnImage, tapsValue } from "./taps";
 import { Ratchet, type RatchetState, b64e } from "./crypto";
 import { chatView } from "./view";
 import { BUILD, ICONS, h, icon, infoPopup } from "./dom";
-import { openDetails } from "./details";
+import { detailsLines } from "./details";
+import { statsPanel } from "./stats";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
 import { type BackgroundTask, type TasksUi, everyWords, openTasks, runningCards, startedMarks } from "./tasks";
@@ -207,6 +208,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const statusText = h("b", {});
   const dot = h("span", { class: "dot" });
   const statusBox = h("div", { class: "status" }, h("span", {}, dot, statusText), h("span", { class: "lock" }, icon(ICONS.lock), " End-to-end encrypted"));
+  const live = statsPanel(); // between "home · online" and the buttons (SPEC §7.4 "Live diagnostics")
   const menu = h("button", { class: "icon-btn", type: "button", "aria-label": "Settings", title: "Settings" }, icon(ICONS.gear));
   const memoryBtn = h("button", { class: "icon-btn", type: "button", "aria-label": "Memory", title: "Memory" }, icon(ICONS.memory));
   const tasksBtn = h("button", { class: "icon-btn", type: "button", "aria-label": "Tasks", title: "Tasks" }, icon(ICONS.tasks));
@@ -243,7 +245,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const installHint = h("div", { class: "banner" }, "Safari may delete this pairing after 7 days without a visit. To keep Aha! on your Home Screen, add it (Share → Add to Home Screen) and pair it again there: it keeps its own data, so this pairing isn't in it.");
   installHint.hidden = !ios || installed;
   app.replaceChildren(
-    h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, tasksBtn, memoryBtn, menu)),
+    h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, live.el, tasksBtn, memoryBtn, menu)),
     installHint,
     banner,
     scroller,
@@ -308,7 +310,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     return dayWords(ts, Date.now() / 1000, client.settings.dates);
   }
 
-  let detailsUi: { seq: number; show(events: TraceEvent[]): void } | null = null;
+  let details: ReturnType<typeof detailsLines> | null = null; // each request's Details line (SPEC §7.4); made with the client
   // The person's connected accounts, shown as labels in replies (SPEC §7.4 "Labels"); asked once online.
   let accounts: string[] = [];
   let askedAccounts = false;
@@ -349,41 +351,16 @@ async function chat(store: Store, identity: Identity): Promise<void> {
           const about = h("div", {}, h("b", {}, note.title), h("p", {}, note.prompt), note.every ? h("small", {}, everyWords(note.every)) : "");
           box.append(...infoPopup(about, "What this task does", "about"));
         }
-        box.append(messageMenu(it.seq));
         return box;
       }
-      el.append(messageMenu(it.seq));
       return el;
     }
     if (it.t === "approval") return approvalCard(it);
-    // A tool Aha! started using, as it happened (SPEC §7.4 "Tools used"): side info, not part of a reply.
+    // A request's Details line (SPEC §7.4 "Details"): what the model is doing, live, closed until opened.
+    if (it.t === "steps" && details) return details.line(it.seq, typeof it.task === "string" ? it.task : "");
+    // A tool line from before Details lines: side info, not part of a reply.
     if (it.t === "tool" && typeof it.label === "string") return h("div", { class: "tool-use" }, `Used ${it.label}`);
     return null;
-  }
-
-  /** ⋯ under each of Aha!'s messages: Show details (SPEC §3.8). */
-  function messageMenu(seq: number): HTMLElement {
-    const more = h("button", { class: "more", type: "button", "aria-label": "More", "aria-haspopup": "menu", "aria-expanded": "false" }, icon(ICONS.menu));
-    const show = h("button", { type: "button", role: "menuitem" }, "Show details");
-    const pop = h("div", { class: "more-menu", role: "menu", hidden: "" }, show);
-    const shut = (e?: Event) => {
-      if (e && wrap.contains(e.target as Node)) return;
-      pop.hidden = true;
-      more.setAttribute("aria-expanded", "false");
-      document.removeEventListener("click", shut);
-    };
-    more.onclick = () => {
-      if (!pop.hidden) return shut();
-      pop.hidden = false;
-      more.setAttribute("aria-expanded", "true");
-      setTimeout(() => document.addEventListener("click", shut));
-    };
-    show.onclick = () => {
-      shut();
-      detailsUi = openDetails(client, seq, () => (detailsUi = null));
-    };
-    const wrap = h("div", { class: "more-wrap" }, more, pop);
-    return wrap;
   }
 
   function approvalCard(it: Item): HTMLElement {
@@ -588,9 +565,11 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       // The model answers one request at a time for the household (SPEC §3.3): say when it's someone else's turn.
       workingText.textContent = queued ? " Aha! is finishing someone else's request first…" : " Aha! is working…";
       setBusy(on);
+      if (!on) details?.idle();
     },
     status(s) {
       setStatus(s.connected, s.computer);
+      if (!s.computer) live.hide();
       if (s.computer && !askedAccounts) {
         askedAccounts = true;
         void client.send({ t: "connections_request" });
@@ -634,7 +613,13 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       settingsUi?.showModel(m);
     },
     trace(seq, events) {
-      if (detailsUi?.seq === seq) detailsUi.show(events);
+      details?.trace(seq, events);
+    },
+    step(task, event) {
+      details?.step(task, event);
+    },
+    stats(s) {
+      live.show(s);
     },
     report(msg) {
       settingsUi?.onReport(msg);
@@ -651,6 +636,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       screen(mark(), h("h1", {}, "This device was unpaired"), h("p", {}, "Its keys and cached messages were deleted. Pair it again with a new QR code from your computer."));
     },
   });
+  details = detailsLines(client);
 
   // cached messages first
   // The device keeps the last 5 days (SPEC §7.5); older messages come from the computer on scroll.

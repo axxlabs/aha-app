@@ -246,6 +246,28 @@ export function traceEvents(raw: unknown): TraceEvent[] {
   return raw.filter((e): e is TraceEvent => !!e && typeof e === "object" && typeof e.kind === "string" && typeof e.ts === "string");
 }
 
+/** The computer's live diagnostics (SPEC §7.4): each part only when the computer could read it. */
+export interface Stats {
+  cpu?: { load?: number; temp?: number };
+  mem?: { used: number; total: number };
+  gpu?: { load: number; temp: number; mem: number; mem_total: number };
+}
+
+const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/** The computer's `stats`, keeping only numbers. */
+export function stats(raw: unknown): Stats {
+  const m = (raw ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  const out: Stats = {};
+  const cpu = m.cpu ?? {};
+  if (num(cpu.load) || num(cpu.temp)) out.cpu = { ...(num(cpu.load) ? { load: cpu.load } : {}), ...(num(cpu.temp) ? { temp: cpu.temp } : {}) };
+  const mem = m.mem ?? {};
+  if (num(mem.used) && num(mem.total) && mem.total > 0) out.mem = { used: mem.used, total: mem.total };
+  const gpu = m.gpu ?? {};
+  if (num(gpu.load) && num(gpu.temp) && num(gpu.mem) && num(gpu.mem_total)) out.gpu = { load: gpu.load, temp: gpu.temp, mem: gpu.mem, mem_total: gpu.mem_total };
+  return out;
+}
+
 /** A transcript time ("2026-11-23T08:41:02+0000") as epoch milliseconds, or NaN. */
 export function traceTime(ts: string): number {
   return Date.parse(ts.replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
@@ -273,6 +295,8 @@ export interface Events {
   connections(emails: string[]): void; // every connected account (SPEC §3.4 "Connections")
   model(m: { current: string; choices: ModelChoice[] }): void;
   trace(seq: number, events: TraceEvent[]): void;
+  step(task: string, event: TraceEvent): void; // a request's record as it happens (SPEC §7.4 "Details")
+  stats(s: Stats): void; // the computer's live diagnostics (SPEC §7.4 "Live diagnostics")
   error(code: string): void;
   revoked(): void;
   report(msg: { t: "report_draft" | "report_sent"; id: string; text?: string; ok?: boolean; code?: string }): void;
@@ -467,6 +491,14 @@ export class Client {
         break;
       case "trace":
         if (typeof msg.seq === "number") this.on.trace(msg.seq, traceEvents(msg.events));
+        break;
+      case "step": {
+        const [event] = traceEvents([msg.event]);
+        if (typeof msg.task === "string" && msg.task && event) this.on.step(msg.task, event);
+        break;
+      }
+      case "stats":
+        this.on.stats(stats(msg));
         break;
       case "cert":
         if (msg.cert && certValid(msg.cert, this.identity.pin) && msg.cert.device === this.dev) {

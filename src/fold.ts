@@ -28,7 +28,8 @@ export interface Note {
   text: string; // what it said
 }
 
-const shown = (it: Item) => it.t === "msg" || it.t === "approval" || it.t === "tool"; // aha_local/folding.py SHOWN
+/** An item the chat shows, as aha_local/folding.py SHOWN: a message, a card, a Details line (an old tool line). */
+export const shown = (it: Item) => it.t === "msg" || it.t === "approval" || it.t === "steps" || it.t === "tool";
 const sameDay = (a: number, b: number) => new Date(a * 1000).toDateString() === new Date(b * 1000).toDateString();
 export const isBreak = (before: number, after: number) => after - before >= BREAK_SECONDS || !sameDay(before, after);
 

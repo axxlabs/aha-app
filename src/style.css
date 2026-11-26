@@ -45,18 +45,19 @@ a { color: inherit; text-underline-offset: 3px; }
 
 .chat { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .col { max-width: 760px; margin: 0 auto; padding: 18px 16px 28px; display: flex; flex-direction: column; gap: 14px; }
-/* A day's heading (SPEC §7.4 "Folding"): at the chat's left, its topics and messages under it. */
-.day { align-self: stretch; font-size: 12px; font-weight: 700; letter-spacing: .3px; color: var(--muted);
-  margin: 16px 0 2px; padding: 0 2px 4px; border-bottom: 1px solid var(--line); }
-.day:first-child { margin-top: 4px; }
+/* A day's heading (SPEC §7.4 "Folding"): centred, its topics and messages under it. */
+.day { align-self: center; font-size: 12px; font-weight: 700; letter-spacing: .3px; color: var(--muted); margin: 4px 0 0; }
+.day:first-child { margin-top: 0; }
 /* A folded part of the chat (SPEC §7.4 "Folding"): grey text, not a bubble; the arrow says folded or open. */
-/* A folded topic: the title on the left, its icons, and its time in a column on the right. */
-.fold { align-self: stretch; display: flex; gap: 8px; align-items: center; background: none; border: 0; padding: 5px 2px;
+/* A folded topic: the title on the left; its icons and its time on the right. Topic lines sit close together
+   (the chat's gap is for messages). */
+.fold { align-self: stretch; display: flex; gap: 8px; align-items: center; background: none; border: 0; padding: 3px 4px; line-height: 1.35;
   margin: 0; font: inherit; font-size: 14px; color: var(--ink); text-align: left; cursor: pointer; border-radius: 6px; }
 .fold:hover { background: var(--soft); }
-.fold .chevron { flex: none; width: 1em; color: var(--muted); }
-.fold .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fold .marks { flex: 1 0 auto; display: flex; gap: 4px; align-items: center; }
+.fold .chevron { flex: none; width: 10px; font-size: 9px; line-height: 1; color: var(--muted); opacity: .8; }
+.fold + .fold, .day + .fold { margin-top: -12px; }
+.fold .title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold .marks { flex: none; display: flex; gap: 4px; align-items: center; }
 .fold time { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* A folded topic's background tasks (SPEC §7.4 "Folding"): a small box like a task note, its edge in the note's
    colour, for each kind of note in it; and the tasks it started, the Tasks icon, coloured while still running. */

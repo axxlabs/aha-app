@@ -394,8 +394,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const inputs: (HTMLInputElement | HTMLTextAreaElement | null)[] = [];
     fields.forEach((f) => {
       const hidden: Record<string, string> = f.kind === "taps" ? { hidden: "" } : {}; // a check card's taps are made on the screenshot
-      dl.append(h("dt", hidden, f.label));
-      const dd = h("dd", f.kind === "longtext" ? { class: "long", ...hidden } : hidden, f.value);
+      const cls = f.kind === "longtext" ? "long" : f.kind === "bool" ? "tick" : "";
+      dl.append(h("dt", cls === "tick" ? { class: "tick", ...hidden } : hidden, f.label));
+      const dd = h("dd", cls ? { class: cls, ...hidden } : hidden, f.value);
       dl.append(dd);
       inputs.push(null);
     });
@@ -447,8 +448,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     card.append(dl, actions, stateEl);
     let editing = false;
     // A sign-in card's inputs are open from the start: the person types into them (SPEC §5.3). A check card's
-    // only input is the screenshot. A permissions card's ticks are open too: the person unticks what it may not do.
-    const openInputs = it.kind === "signin" || it.kind === "check" || it.kind === "permissions";
+    // only input is the screenshot. Ticks (a task's permissions) are always open: the person unticks what it may
+    // not do without asking.
+    const openInputs = it.kind === "signin" || it.kind === "check";
     const inputFor = (f: (typeof fields)[number]): HTMLInputElement | HTMLTextAreaElement => {
       if (f.kind === "longtext") {
         const ta = h("textarea", { rows: "8", "aria-label": f.label }) as HTMLTextAreaElement;
@@ -481,9 +483,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const approve = h("button", { class: "primary", type: "button" }, buttons[0] ?? "Approve");
     const edit = buttons.length === 3 ? h("button", { type: "button" }, buttons[1]) : null;
     const decline = h("button", { type: "button" }, buttons[buttons.length - 1] ?? "Decline");
-    // A permissions card's third way (SPEC §3.4): nothing is allowed and Aha! goes back to its plan.
-    const replan = typeof it.replan === "string" && it.replan ? h("button", { class: "replan", type: "button" }, it.replan.slice(0, 40)) : null;
-    actions.append(approve, ...(edit ? [edit] : []), decline, ...(replan ? [replan] : []));
+    actions.append(approve, ...(edit ? [edit] : []), decline);
+    const ticks = fields.some((f) => f.kind === "bool");
     showTaps();
     const disable = (text: string) => {
       for (const b of actions.querySelectorAll("button")) b.setAttribute("disabled", "");
@@ -491,7 +492,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     };
     approve.onclick = async () => {
       const values = fields.map(valueOf);
-      const sent = await client.send({ t: "approval_reply", id, decision: "approve", ...(editing ? { values } : {}) });
+      const sent = await client.send({ t: "approval_reply", id, decision: "approve", ...(editing || ticks ? { values } : {}) });
       fields.forEach((f, i) => {
         const inp = inputs[i];
         if (f.kind === "secret" && inp) inp.value = "";
@@ -501,22 +502,24 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     decline.onclick = async () => {
       if (await client.send({ t: "approval_reply", id, decision: "decline" })) disable("Sending…");
     };
-    if (replan)
-      replan.onclick = async () => {
-        if (await client.send({ t: "approval_reply", id, decision: "replan" })) disable("Sending…");
-      };
     if (edit)
       edit.onclick = () => {
         editing = true;
         edit.setAttribute("disabled", "");
         [...dl.querySelectorAll("dd")].forEach((dd, i) => {
-          if (!fields[i].editable) return;
+          if (!fields[i].editable || inputs[i]) return;
           const inp = inputFor(fields[i]);
           inputs[i] = inp;
           dd.replaceChildren(inp);
         });
         inputs.find(Boolean)?.focus();
       };
+    if (!openInputs)
+      [...dl.querySelectorAll("dd")].forEach((dd, i) => {
+        if (fields[i].kind !== "bool") return;
+        inputs[i] = inputFor(fields[i]);
+        dd.replaceChildren(inputs[i]);
+      });
     if (openInputs) {
       editing = true;
       [...dl.querySelectorAll("dd")].forEach((dd, i) => {

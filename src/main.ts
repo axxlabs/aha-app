@@ -770,7 +770,18 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   tasksBtn.onclick = () => {
     if (tasksUi) return tasksUi.close();
     closePanes();
-    tasksUi = openTasks(client, () => (tasksUi = null));
+    tasksUi = openTasks(client, () => (tasksUi = null), {
+      // A task's latest note in the chat (it carries the task's id), for the panel's link to it.
+      latest(id) {
+        let found: { seq: number; text: string } | null = null;
+        for (const it of view.items.values()) {
+          const task = it.task as { id?: unknown } | undefined;
+          if (it.t === "msg" && task?.id === id && (!found || it.seq > found.seq)) found = { seq: it.seq, text: String(it.text ?? "") };
+        }
+        return found;
+      },
+      reveal: (seq) => view.reveal(seq),
+    });
   };
 
   // A break can happen while the app is open in the background: fold when it's looked at again.

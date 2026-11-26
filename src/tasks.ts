@@ -5,6 +5,7 @@
 // the top, the idle time the checks wait for (they run only while nobody uses Aha!).
 import type { Client } from "./client";
 import { ICONS, h, icon, openSheet } from "./dom";
+import { gist } from "./fold";
 import { formatDate } from "./markdown";
 
 export interface BackgroundTask {
@@ -143,7 +144,13 @@ export function idleLine(state: Pick<TasksState, "idle_since" | "idle_after" | "
   return `Idle for ${idleWords(now - state.idle_since)} · checks run after ${idleWords(state.idle_after)} idle`;
 }
 
-export function openTasks(client: Client, onClose: () => void): TasksUi {
+/** The chat as the Tasks panel needs it: a task's latest message there, and going to it (SPEC §7.4). */
+export interface ChatLink {
+  latest(taskId: string): { seq: number; text: string } | null;
+  reveal(seq: number): boolean;
+}
+
+export function openTasks(client: Client, onClose: () => void, chat?: ChatLink): TasksUi {
   const offline = () => h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline.");
   const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
   const idle = h("p", { class: "idle" });
@@ -316,10 +323,25 @@ export function openTasks(client: Client, onClose: () => void): TasksUi {
         h("dd", {}, t.until === null ? "No end" : when(t.until)),
         ...(t.allowed?.length ? [h("dt", {}, "Allowed"), h("dd", {}, h("ul", { class: "allowed" }, ...t.allowed.map((a) => h("li", {}, a))))] : []),
       ),
-      t.last || t.last_how ? h("p", { class: "last" }, h("small", {}, `Last check${lastHow(t.last_how)} · ${checks}`), t.last) : h("p", { class: "last" }, h("small", {}, "Not checked yet")),
+      lastCheck(t, checks),
       foot,
     );
   };
+
+  /** What the last check found. When it told the person, a card that goes to its message in the chat, not a copy
+   * of it (2026-11-26); a check that waited sent nothing, so its own words show. */
+  function lastCheck(t: BackgroundTask, checks: string): HTMLElement {
+    if (!t.last && !t.last_how) return h("p", { class: "last" }, h("small", {}, "Not checked yet"));
+    const head = h("small", {}, `Last check${lastHow(t.last_how)} · ${checks}`);
+    const msg = t.last_how === "notify" ? chat?.latest(t.id) : null;
+    if (!msg) return h("p", { class: "last" }, head, t.last);
+    const go = h("button", { type: "button", class: "last-link", title: "Show this message in the chat" }, h("span", {}, gist(msg.text)), h("span", { class: "go", "aria-hidden": "true" }, "→"));
+    go.onclick = () => {
+      if (!chat?.reveal(msg.seq)) return;
+      shut();
+    };
+    return h("div", { class: "last" }, head, go);
+  }
 
   ask();
   return {

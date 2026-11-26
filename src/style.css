@@ -304,6 +304,13 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .tasks .task-allowed label.check { align-self: start; padding-bottom: 0; }
 .tasks .task .last { margin: 8px 0 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
 .tasks .task .last small { display: block; font-size: 12px; color: var(--muted); }
+/* The last check's message: a card that goes to it in the chat (SPEC §7.4) */
+.tasks .task .last-link { display: flex; gap: 10px; align-items: center; width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.tasks .task .last-link:hover, .tasks .task .last-link:focus-visible { border-color: var(--accent); }
+.tasks .task .last-link span:first-child { flex: 1; }
+.tasks .task .last-link .go { color: var(--muted); }
+/* A message the Tasks panel went to: marked for a moment */
+.revealed { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 12px; transition: outline-color 1s; }
 .tasks .task details { margin-top: 8px; font-size: 13px; flex: 1; min-width: 0; }
 .tasks .task-foot { display: flex; align-items: flex-start; gap: 10px; }
 .tasks .run { flex: none; margin-top: 6px; font: inherit; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px;

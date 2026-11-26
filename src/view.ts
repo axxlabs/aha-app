@@ -36,6 +36,7 @@ export function chatView(d: ViewDeps) {
   let queued = false;
   let wantBottom = false;
   let scrollTo: number | null = null; // a fold line just opened: scroll it to the top on the next draw
+  let reveal: number | null = null; // a message to bring into view on the next draw (the Tasks panel's link)
 
   const atBottom = () => d.scroller.scrollHeight - d.scroller.scrollTop - d.scroller.clientHeight < 80;
   const toBottom = () => (d.scroller.scrollTop = d.scroller.scrollHeight);
@@ -165,7 +166,14 @@ export function chatView(d: ViewDeps) {
     }
     const opened = scrollTo === null ? undefined : foldLines.get(scrollTo);
     scrollTo = null;
-    if (opened?.isConnected) {
+    const shownEl = reveal === null ? undefined : els.get(reveal);
+    reveal = null;
+    if (shownEl && d.col.contains(shownEl)) {
+      // In the middle of the screen, marked for a moment, so the eye finds it.
+      d.scroller.scrollTop += shownEl.getBoundingClientRect().top - d.scroller.getBoundingClientRect().top - d.scroller.clientHeight / 3;
+      shownEl.classList.add("revealed");
+      setTimeout(() => shownEl.classList.remove("revealed"), 2000);
+    } else if (opened?.isConnected) {
       // The day above it too, when it's the first of its day, so the line keeps its heading in view.
       const prev = opened.previousElementSibling as HTMLElement | null;
       const top = prev?.classList.contains("day") ? prev : opened;
@@ -192,6 +200,18 @@ export function chatView(d: ViewDeps) {
     collapseAll(): void {
       expanded.clear();
       invalidate(true);
+    },
+    /** Bring item `seq` into view: its topic opens if folded (SPEC §7.4, the Tasks panel's last message). False
+     * when this device doesn't have it. */
+    reveal(seq: number): boolean {
+      if (!items.has(seq)) return false;
+      const all = [...items.values()];
+      const resolved = new Set(all.filter((it) => it.t === "approval_state").map((it) => String(it.id)));
+      const part = plan(all, resolved, now(), d.busy()).find((p) => p.first <= seq && seq <= p.last);
+      if (part?.folded) expanded.add(part.first);
+      reveal = seq;
+      invalidate();
+      return true;
     },
     /** Items in (live, synced, older history, the cache). */
     add(list: Item[]): void {

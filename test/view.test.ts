@@ -64,6 +64,21 @@ describe("the chat view (SPEC §7.4)", () => {
     expect(line.querySelector("time")?.textContent).toMatch(/10:00|10:00\s?AM/);
   });
 
+  it("goes to a message: its folded topic opens and the message is marked (the Tasks panel's link)", () => {
+    const { view, shown, col } = setup();
+    const a = [me(T, "order rice"), aha(T + 5, "Task done: rice delivered")];
+    view.add(a);
+    const b = [me(T + 60, "who is X"), aha(T + 65, "X is …")];
+    view.add(b);
+    view.add([{ seq: ++n, ts: T + 66, t: "title", from: b[0].seq, text: "Who is X", new: true } as Item]);
+    view.add([{ seq: ++n, ts: T + 6, t: "title", from: a[0].seq, text: "Rice order" } as Item]);
+    expect(shown()[0]).toBe("▸Rice order");
+    expect(view.reveal(a[1].seq)).toBe(true);
+    expect(shown()).toContain("Task done: rice delivered");
+    expect([...col.querySelectorAll(".revealed")].map((el) => el.textContent)).toEqual(["Task done: rice delivered"]);
+    expect(view.reveal(9999)).toBe(false); // not on this device
+  });
+
   it("[collapse all] shows while a folded topic is open, and folds them all again", () => {
     const { view, col } = setup(T + 2 * 86400);
     view.add([me(T, "first"), aha(T + 60, "a"), me(T + 3 * 3600, "second"), aha(T + 3 * 3600 + 60, "b")]);

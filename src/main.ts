@@ -232,8 +232,11 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   let photo: Photo | null = null;
   const form = h("form", {}, photoBtn, fileInput, input, sendBtn);
   // Fold the conversation going on now, on every device; the next message starts a new part (SPEC §7.4).
-  const cutBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold this conversation away" }, "[collapse]");
+  const cutBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold this conversation away: what you write next starts a new topic" }, "[collapse into new topic]");
   cutBtn.onclick = () => void client.send({ t: "cut" });
+  const collapseAllBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold every topic you opened" }, "[collapse all]");
+  collapseAllBtn.onclick = () => view.collapseAll();
+  const chatActions = h("div", { class: "chat-actions" }, collapseAllBtn, cutBtn);
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
@@ -261,6 +264,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     busy: () => busy,
     marks,
     cut: cutBtn,
+    collapseAll: collapseAllBtn,
+    actions: chatActions,
   });
   // The background tasks, to mark the topics that started them (null until the computer sent the list).
   let tasks: BackgroundTask[] | null = null;

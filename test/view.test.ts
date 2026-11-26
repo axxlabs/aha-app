@@ -64,6 +64,16 @@ describe("the chat view (SPEC §7.4)", () => {
     expect(line.querySelector("time")?.textContent).toMatch(/10:00|10:00\s?AM/);
   });
 
+  it("[collapse all] shows while a folded topic is open, and folds them all again", () => {
+    const { view, col } = setup(T + 2 * 86400);
+    view.add([me(T, "first"), aha(T + 60, "a"), me(T + 3 * 3600, "second"), aha(T + 3 * 3600 + 60, "b")]);
+    expect(col.querySelectorAll(".fold").length).toBe(2);
+    (col.querySelector(".fold") as HTMLButtonElement).click();
+    expect([...col.children].some((el) => el.textContent === "a")).toBe(true);
+    view.collapseAll();
+    expect([...col.children].some((el) => el.textContent === "a")).toBe(false);
+  });
+
   it("clearing history leaves nothing behind: no fold lines, no days", () => {
     const { view, col, shown } = setup(T + 7 * 3600);
     view.add([me(T, "old"), aha(T + 5, "old answer"), me(T + 4 * 3600, "later"), aha(T + 4 * 3600 + 5, "later answer")]);

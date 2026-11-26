@@ -15,7 +15,9 @@ export interface ViewDeps {
   dayLabel(ts: number): string;
   busy(): boolean; // a task is running: the part going on doesn't fold
   marks?(p: Part, states: Map<string, string>): Node[]; // small icons on a folded part's line (its background tasks)
-  cut?: HTMLElement; // [collapse]: last in the chat, under the latest message, while there's a part going on
+  cut?: HTMLElement; // [collapse into new topic]: shown while there's a part going on
+  collapseAll?: HTMLElement; // [collapse all]: shown while a folded part is open; folds them all again
+  actions?: HTMLElement; // the row holding both, last in the chat, under the latest message (when one shows)
   now?: () => number; // seconds (tests)
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
 }
@@ -95,6 +97,7 @@ export function chatView(d: ViewDeps) {
     let at = 0;
     const parts = plan(all, new Set(states.keys()), t, d.busy());
     if (d.cut) d.cut.hidden = !parts.length || parts[parts.length - 1].folded;
+    if (d.collapseAll) d.collapseAll.hidden = !parts.some((p) => p.folded && expanded.has(p.first));
     for (const p of parts) {
       const open = expanded.has(p.first);
       if (p.folded) {
@@ -137,7 +140,9 @@ export function chatView(d: ViewDeps) {
       }
     }
     want.push(...pending.values(), d.working);
-    if (d.cut && !d.cut.hidden) want.push(d.cut);
+    if (d.actions) {
+      if ((d.cut && !d.cut.hidden) || (d.collapseAll && !d.collapseAll.hidden)) want.push(d.actions);
+    } else if (d.cut && !d.cut.hidden) want.push(d.cut);
     // Move only what's out of place, so a card being typed into keeps its focus.
     let cur = d.col.firstChild;
     for (const n of want) {
@@ -174,6 +179,11 @@ export function chatView(d: ViewDeps) {
     invalidate,
     toBottom,
     atBottom,
+    /** [collapse all]: every folded part the person opened folds again; the chat's end comes back in view. */
+    collapseAll(): void {
+      expanded.clear();
+      invalidate(true);
+    },
     /** Items in (live, synced, older history, the cache). */
     add(list: Item[]): void {
       for (const it of list) {

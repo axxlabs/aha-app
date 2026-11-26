@@ -13,7 +13,7 @@ import { BUILD, ICONS, h, icon, infoPopup } from "./dom";
 import { openDetails } from "./details";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
-import { type BackgroundTask, type TasksUi, everyWords, openTasks, startedMarks } from "./tasks";
+import { type BackgroundTask, type TasksUi, everyWords, openTasks, runningCards, startedMarks } from "./tasks";
 import { type Part, dayWords } from "./fold";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
@@ -270,12 +270,18 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // The background tasks, to mark the topics that started them (null until the computer sent the list).
   let tasks: BackgroundTask[] | null = null;
 
+  /** Which task cards' tasks still run, over the whole chat (a task belongs to one card only). */
+  function running(states: Map<string, string>): Set<string> | null {
+    const cards = [...view.items.values()].filter((it) => it.t === "approval" && it.kind === "task").map((it) => ({ id: String(it.id), ts: it.ts }));
+    return runningCards(cards, states, tasks);
+  }
+
   /** A folded topic's icons (SPEC §7.4 "Folding"): a small box for each kind of task note in it, drawn like the
    * note itself, and the tasks it started, still running or ended. */
   function marks(p: Part, states: Map<string, string>): Node[] {
     const heads: Record<string, string> = { update: "A task update", done: "A task done", failed: "A task failed", expired: "A task expired" };
     const notes = p.notes.map((k) => h("span", { class: `note-mark ${k}`, title: `${heads[k]} in this topic`, role: "img", "aria-label": `${heads[k]} in this topic` }));
-    const started = startedMarks(p.started, states, tasks).map(({ running, count }) => {
+    const started = startedMarks(p.started, states, running(states)).map(({ running, count }) => {
       const words = `Started ${count > 1 ? `${count} background tasks` : "a background task"} here: ${running ? "still running" : "ended"}`;
       return h("span", { class: `task-mark ${running ? "running" : "ended"}`, title: words, role: "img", "aria-label": words }, icon(ICONS.tasks));
     });

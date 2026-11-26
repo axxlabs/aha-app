@@ -37,24 +37,38 @@ export interface TasksUi {
 
 const REFRESH_MS = 30_000;
 
-/** A topic's started tasks, for its fold line: what was approved, as running (still in the list) and ended, each
- * with how many. Nothing until the list came (`tasks` null). A task started before tasks kept their card is
- * matched by when it was created: within six hours after its card. */
+/** The cards whose task still runs: each task in the list belongs to one card, the one that started it. A task
+ * kept before tasks kept their card is matched to the last approved task card before it was created, within six
+ * hours; never one card for two tasks, never one task for two cards. null until the list came. */
+export function runningCards(
+  cards: { id: string; ts: number }[],
+  states: Map<string, string>,
+  tasks: Pick<BackgroundTask, "card" | "created">[] | null,
+): Set<string> | null {
+  if (!tasks) return null;
+  const approved = cards.filter((c) => states.get(c.id) === "approved").sort((a, b) => a.ts - b.ts);
+  const running = new Set(tasks.flatMap((t) => (t.card ? [t.card] : [])));
+  const known = new Set(approved.map((c) => c.id));
+  // The older tasks, oldest first, each taking the latest free card before it.
+  for (const t of tasks.filter((t) => !t.card).sort((a, b) => a.created - b.created)) {
+    const card = approved.filter((c) => c.ts <= t.created && t.created - c.ts <= 6 * 3600 && !running.has(c.id)).pop();
+    if (card) running.add(card.id);
+  }
+  return new Set([...running].filter((id) => known.has(id)));
+}
+
+/** A topic's started tasks, for its fold line: what was approved, as running and ended, each with how many.
+ * Nothing until the list came (`running` null). */
 export function startedMarks(
   started: { id: string; ts: number }[],
   states: Map<string, string>,
-  tasks: Pick<BackgroundTask, "card" | "created">[] | null,
+  running: Set<string> | null,
 ): { running: boolean; count: number }[] {
-  if (!tasks) return [];
-  let running = 0;
-  let ended = 0;
-  for (const s of started) {
-    if (states.get(s.id) !== "approved") continue;
-    const alive = tasks.some((t) => (t.card ? t.card === s.id : t.created >= s.ts && t.created <= s.ts + 6 * 3600));
-    if (alive) running++;
-    else ended++;
-  }
-  return [...(running ? [{ running: true, count: running }] : []), ...(ended ? [{ running: false, count: ended }] : [])];
+  if (!running) return [];
+  const approved = started.filter((s) => states.get(s.id) === "approved");
+  const on = approved.filter((s) => running.has(s.id)).length;
+  const off = approved.length - on;
+  return [...(on ? [{ running: true, count: on }] : []), ...(off ? [{ running: false, count: off }] : [])];
 }
 
 /** "Every 30 min", "Every 4 hours", "Every day". */

@@ -231,7 +231,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
         box.checked = on;
         return [box, h("label", { class: "check" }, box, h("span", {}, words))] as const;
       };
-      const [search, searchRow] = tick(g.search, "Search the web, even after reading your email or private pages");
+      const [search, searchRow] = tick(g.search, "Search the web");
       const [drafts, draftsRow] = tick(g.drafts, "Save email drafts in your mailbox (nothing is sent)");
       const [adds, addsRow] = tick(g.calendar_add, "Add new events to your calendar");
       const [changes, changesRow] = tick(g.calendar_change, "Change events already in your calendar");

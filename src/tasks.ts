@@ -12,6 +12,7 @@ export interface BackgroundTask {
   id: string;
   title: string;
   prompt: string;
+  done_when?: string; // what ends it, or "never" (SPEC §3.4)
   every: number; // seconds
   until: number | null; // epoch seconds; null = no end
   next: number;
@@ -206,7 +207,8 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
     };
     // Edit (SPEC §7.4): the person changes what each check does; their own action, so no card. The next check
     // runs the new text.
-    const how = h("details", {}, h("summary", {}, "How it checks"), h("p", {}, t.prompt));
+    const ends = t.done_when === "never" ? "Never: until you cancel it" : t.done_when || "";
+    const how = h("details", {}, h("summary", {}, "How it checks"), h("p", {}, t.prompt), ...(ends ? [h("p", {}, h("b", {}, "Done when: "), ends)] : []));
     const editBtn = h("button", { class: "run", type: "button" }, "Edit");
     const foot = h("div", { class: "task-foot" }, how, editBtn, run);
     editBtn.onclick = () => {
@@ -214,6 +216,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
       const field = (label: string, input: HTMLElement) => h("label", {}, h("span", {}, label), input);
       const title = h("input", { type: "text", value: t.title, maxlength: "120" }) as HTMLInputElement;
       const box = h("textarea", { rows: "6", maxlength: "2000" }, t.prompt) as HTMLTextAreaElement;
+      const doneWhen = h("input", { type: "text", value: t.done_when ?? "", maxlength: "300", placeholder: "What ends it, or never" }) as HTMLInputElement;
       const every = h("input", { type: "number", min: "5", step: "1", value: String(Math.round(t.every / 60)) }) as HTMLInputElement;
       const nextAt = h("input", { type: "datetime-local", value: toLocalInput(Math.max(t.next, Date.now() / 1000)) }) as HTMLInputElement;
       const until = h("input", { type: "datetime-local", value: t.until === null ? "" : toLocalInput(t.until) }) as HTMLInputElement;
@@ -255,6 +258,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
         { class: "task-edit" },
         field("Waiting for", title),
         field("How it checks", box),
+        field("Done when (or never)", doneWhen),
         h("div", { class: "task-edit-row" }, field("Check every (minutes)", every), field("Next check", nextAt)),
         h("div", { class: "task-edit-row" }, field("Until", until), h("label", { class: "check" }, noEnd, h("span", {}, "No end"))),
         allowed,
@@ -276,6 +280,8 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
           ? "Say what it waits for."
           : !box.value.trim()
             ? "Say how it checks."
+            : !doneWhen.value.trim()
+              ? "Say what ends it, or never."
             : !(minutes >= 5)
               ? "Check at most every 5 minutes."
               : next === null
@@ -298,7 +304,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
           calendar_add: adds.checked,
           calendar_change: changes.checked,
         };
-        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), every: Math.round(minutes) * 60, next, until: end, grant });
+        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), done_when: doneWhen.value.trim(), every: Math.round(minutes) * 60, next, until: end, grant });
         if (sent) done(); // the computer sends the new list
         else save.removeAttribute("disabled");
       };

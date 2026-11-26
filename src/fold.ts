@@ -5,6 +5,7 @@
 // a break is two hours without a message, or a new day; a new subject starts a part of its own, and so does a
 // cut (the person's [collapse]: everything before it folds at once). Each part before a break folds into one grey line with
 // its title; what's unfinished stays open; the part still going on doesn't fold and has no title.
+import { type DateFormat, formatDate } from "./markdown";
 import type { Item } from "./store";
 
 export const BREAK_SECONDS = 2 * 3600;
@@ -78,9 +79,20 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
   });
 }
 
-export function foldLabel(p: Part, now: number): string {
-  const d = new Date(p.ts * 1000);
-  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  const day = sameDay(p.ts, now) ? "today" : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-  return `${p.title} · ${day} ${time}`;
+/** A fold line's time: HH:MM, on its right, under its day's heading. */
+export function foldTime(p: Part): string {
+  return new Date(p.ts * 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+/** A day's heading in the chat (SPEC §7.4 "Folding"): "Today", "Yesterday", "Last week · <date>" for the five days
+ * before, then the date, in the device's date format. */
+export function dayWords(ts: number, now: number, format: DateFormat = "short"): string {
+  const d = new Date(ts * 1000);
+  const n = new Date(now * 1000);
+  const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((midnight(n) - midnight(d)) / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  const date = formatDate(d, format, n);
+  return days > 1 && days < 7 ? `Last week · ${date}` : date;
 }

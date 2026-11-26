@@ -36,7 +36,7 @@ function setup(now = T + 600) {
     now: () => now,
     frame: (fn) => fn(), // draw at once
   });
-  const shown = () => [...col.children].map((el) => (el.className === "fold" ? `▸${el.textContent?.slice(1).split(" · ")[0]}` : el.className === "day" ? "day" : el.textContent ?? "")).filter((x) => x !== "day" && x !== "");
+  const shown = () => [...col.children].map((el) => (el.className === "fold" ? `▸${el.querySelector(".title")?.textContent}` : el.className === "day" ? "day" : el.textContent ?? "")).filter((x) => x !== "day" && x !== "");
   return { col, view, shown, made: () => made };
 }
 
@@ -52,6 +52,16 @@ describe("the chat view (SPEC §7.4)", () => {
     expect(shown()).toEqual(["order rice", "done", "new topic: who is X", "X is …"]); // no title yet: one part
     view.add([{ seq: ++n, ts: T + 66, t: "title", from: b[0].seq, text: "Who is X", new: true } as Item]);
     expect(shown()).toEqual(["▸Rice order", "new topic: who is X", "X is …"]); // folded the moment it arrived
+  });
+
+  it("heads each day's topics with the day, once, and each line has its title and time apart", () => {
+    const { view, col } = setup(T + 2 * 86400);
+    view.add([me(T, "first"), aha(T + 60, "a"), me(T + 3 * 3600, "second"), aha(T + 3 * 3600 + 60, "b"), me(T + 86400, "third")]);
+    const order = [...col.children].map((el) => el.className);
+    expect(order).toEqual(["day", "fold", "fold", "day", "fold", "working"]);
+    const line = col.querySelector(".fold") as HTMLElement;
+    expect(line.querySelector(".title")?.textContent).toBe("first");
+    expect(line.querySelector("time")?.textContent).toMatch(/10:00|10:00\s?AM/);
   });
 
   it("clearing history leaves nothing behind: no fold lines, no days", () => {

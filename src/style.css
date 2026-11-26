@@ -45,12 +45,19 @@ a { color: inherit; text-underline-offset: 3px; }
 
 .chat { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .col { max-width: 760px; margin: 0 auto; padding: 18px 16px 28px; display: flex; flex-direction: column; gap: 14px; }
-.day { align-self: center; font-size: 12px; color: var(--muted); margin: 8px 0 2px; }
+/* A day's heading (SPEC §7.4 "Folding"): at the chat's left, its topics and messages under it. */
+.day { align-self: stretch; font-size: 12px; font-weight: 700; letter-spacing: .3px; color: var(--muted);
+  margin: 16px 0 2px; padding: 0 2px 4px; border-bottom: 1px solid var(--line); }
+.day:first-child { margin-top: 4px; }
 /* A folded part of the chat (SPEC §7.4 "Folding"): grey text, not a bubble; the arrow says folded or open. */
-.fold { align-self: stretch; display: flex; gap: 6px; align-items: baseline; background: none; border: 0; padding: 4px 2px;
-  margin: 0; font: inherit; font-size: 14px; color: var(--muted); text-align: left; cursor: pointer; }
-.fold:hover { color: var(--ink); }
-.fold .chevron { flex: none; width: 1em; }
+/* A folded topic: the title on the left, its icons, and its time in a column on the right. */
+.fold { align-self: stretch; display: flex; gap: 8px; align-items: center; background: none; border: 0; padding: 5px 2px;
+  margin: 0; font: inherit; font-size: 14px; color: var(--ink); text-align: left; cursor: pointer; border-radius: 6px; }
+.fold:hover { background: var(--soft); }
+.fold .chevron { flex: none; width: 1em; color: var(--muted); }
+.fold .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold .marks { flex: 1 0 auto; display: flex; gap: 4px; align-items: center; }
+.fold time { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* A folded topic's background tasks (SPEC §7.4 "Folding"): a small box like a task note, its edge in the note's
    colour, for each kind of note in it; and the tasks it started, the Tasks icon, coloured while still running. */
 .fold .note-mark, .fold .task-mark { flex: none; align-self: center; }

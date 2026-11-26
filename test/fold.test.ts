@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 import { describe, expect, it } from "vitest";
-import { plan } from "../src/fold";
+import { dayWords, plan } from "../src/fold";
 import type { Item } from "../src/store";
 
 const T = new Date(2026, 10, 24, 9, 0).getTime() / 1000; // 24 Nov, 09:00 local
@@ -83,5 +83,16 @@ describe("a topic's background tasks (SPEC §7.4 \"Folding\")", () => {
     const [p] = plan(items, new Set(), T + 6 * 60 * min);
     expect(p.notes).toEqual(["update", "done"]);
     expect(p.started).toEqual([{ id: "c1", ts: T + min }]);
+  });
+});
+
+describe("day headings (SPEC §7.4 \"Folding\")", () => {
+  it("says Today, Yesterday, Last week with the date, then the date", () => {
+    const day = 24 * 60 * min;
+    expect(dayWords(T, T + 5 * 60 * min)).toBe("Today");
+    expect(dayWords(T - 9 * 60 * min - 1, T)).toBe("Yesterday"); // a second before midnight is another day
+    expect(dayWords(T - 2 * day, T, "plain")).toBe("Last week · 22 Nov 2026");
+    expect(dayWords(T - 6 * day, T, "plain")).toBe("Last week · 18 Nov 2026");
+    expect(dayWords(T - 7 * day, T, "plain")).toBe("17 Nov 2026");
   });
 });

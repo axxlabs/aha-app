@@ -14,7 +14,7 @@ import { openDetails } from "./details";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
 import { type BackgroundTask, type TasksUi, everyWords, openTasks, startedMarks } from "./tasks";
-import type { Part } from "./fold";
+import { type Part, dayWords } from "./fold";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
@@ -279,7 +279,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const toBottom = view.toBottom;
 
   function dayLabel(ts: number): string {
-    return new Date(ts * 1000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    return dayWords(ts, Date.now() / 1000, client.settings.dates);
   }
 
   let detailsUi: { seq: number; show(events: TraceEvent[]): void } | null = null;

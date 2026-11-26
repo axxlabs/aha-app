@@ -3,7 +3,7 @@
 // The chat view (SPEC §7.4). `items` is the only state; draw() derives everything shown from it: the parts of the
 // chat and their fold lines, day labels, what stays open, and what's being sent. Each item's element is made once
 // and kept, so a card keeps what's typed in it. Everything else only changes the state and calls invalidate().
-import { type Part, foldLabel, plan } from "./fold";
+import { type Part, foldTime, plan } from "./fold";
 import type { Item } from "./store";
 
 export interface ViewDeps {
@@ -34,6 +34,7 @@ export function chatView(d: ViewDeps) {
   const frame = d.frame ?? ((fn: () => void) => requestAnimationFrame(fn));
   let queued = false;
   let wantBottom = false;
+  let scrollTo: number | null = null; // a fold line just opened: scroll it to the top on the next draw
 
   const atBottom = () => d.scroller.scrollHeight - d.scroller.scrollTop - d.scroller.clientHeight < 80;
   const toBottom = () => (d.scroller.scrollTop = d.scroller.scrollHeight);
@@ -58,7 +59,10 @@ export function chatView(d: ViewDeps) {
       line.className = "fold";
       line.onclick = () => {
         if (expanded.has(first)) expanded.delete(first);
-        else expanded.add(first);
+        else {
+          expanded.add(first);
+          scrollTo = first; // opened: its start comes to the top, to read it from the beginning
+        }
         invalidate();
       };
       foldLines.set(first, line);
@@ -94,12 +98,25 @@ export function chatView(d: ViewDeps) {
     for (const p of parts) {
       const open = expanded.has(p.first);
       if (p.folded) {
+        // Days head the chat, at its left; under each, its topics, one line each: the title, its icons, the time.
+        const day = d.dayLabel(p.ts);
+        if (day !== lastDay) want.push(dayLine(day));
+        lastDay = day;
         const line = foldLine(p.first);
         const chevron = document.createElement("span");
         chevron.className = "chevron";
         chevron.setAttribute("aria-hidden", "true");
         chevron.textContent = open ? "▾" : "▸";
-        line.replaceChildren(chevron, ...(d.marks?.(p, states) ?? []), foldLabel(p, t));
+        const title = document.createElement("span");
+        title.className = "title";
+        title.textContent = p.title;
+        const marks = document.createElement("span");
+        marks.className = "marks";
+        marks.append(...(d.marks?.(p, states) ?? []));
+        const time = document.createElement("time");
+        time.textContent = foldTime(p);
+        line.replaceChildren(chevron, title, marks, time);
+        line.title = `${p.title} · ${day} ${time.textContent}`;
         line.setAttribute("aria-expanded", String(open));
         want.push(line);
       }
@@ -132,7 +149,14 @@ export function chatView(d: ViewDeps) {
       cur.remove();
       cur = next;
     }
-    if (stick) toBottom();
+    const opened = scrollTo === null ? undefined : foldLines.get(scrollTo);
+    scrollTo = null;
+    if (opened?.isConnected) {
+      // The day above it too, when it's the first of its day, so the line keeps its heading in view.
+      const prev = opened.previousElementSibling as HTMLElement | null;
+      const top = prev?.classList.contains("day") ? prev : opened;
+      d.scroller.scrollTop += top.getBoundingClientRect().top - d.scroller.getBoundingClientRect().top - 8;
+    } else if (stick) toBottom();
     else d.scroller.scrollTop = d.scroller.scrollHeight - fromBottom; // what's on screen stays put
   }
 

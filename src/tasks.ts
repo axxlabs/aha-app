@@ -17,7 +17,7 @@ export interface BackgroundTask {
   next: number;
   last: string;
   checks: number;
-  updates: number; // NOTIFY messages sent so far: the task reports and goes on
+  updates: number; // notify messages sent so far: the task reports and goes on
   created: number;
   now?: boolean; // Run now was asked: it checks as soon as the model is free
   running?: boolean; // a check of it runs now
@@ -117,7 +117,7 @@ export function nextWords(t: Pick<BackgroundTask, "next" | "now" | "running">, n
   return planned;
 }
 
-/** How the last check ended, beside "Last check" ("" for a plain WAITING). */
+/** How the last check ended, beside "Last check" ("" for a plain waiting). */
 export function lastHow(how: string | undefined): string {
   return { notify: " · sent to you", unfinished: " · didn't finish", interrupted: " · stopped early" }[how ?? ""] ?? "";
 }

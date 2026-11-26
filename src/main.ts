@@ -310,6 +310,11 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     return dayWords(ts, Date.now() / 1000, client.settings.dates);
   }
 
+  /** Live diagnostics only while the app is on screen (SPEC §7.4): each reading is a saved step of the device's
+   * encryption on the computer, so a hidden app asks for none. */
+  function watchStats(): void {
+    if (client?.computer) void client.send({ t: "stats_watch", on: document.visibilityState === "visible" });
+  }
   let details: ReturnType<typeof detailsLines> | null = null; // each request's Details line (SPEC §7.4); made with the client
   // The person's connected accounts, shown as labels in replies (SPEC §7.4 "Labels"); asked once online.
   let accounts: string[] = [];
@@ -570,6 +575,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     status(s) {
       setStatus(s.connected, s.computer);
       if (!s.computer) live.hide();
+      else watchStats(); // a reconnected computer has forgotten who's watching
       if (s.computer && !askedAccounts) {
         askedAccounts = true;
         void client.send({ t: "connections_request" });
@@ -786,6 +792,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
 
   // A break can happen while the app is open in the background: fold when it's looked at again.
   document.addEventListener("visibilitychange", () => {
+    watchStats();
     if (document.visibilityState !== "visible") return;
     view.invalidate(true);
   });

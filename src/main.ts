@@ -11,7 +11,6 @@ import { Ratchet, type RatchetState, b64e } from "./crypto";
 import { chatView } from "./view";
 import { BUILD, ICONS, h, icon, infoPopup } from "./dom";
 import { detailsLines } from "./details";
-import { actionBoxes } from "./actions";
 import { statsPanel } from "./stats";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
@@ -258,11 +257,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   let busy = false;
   let historyStart = 1; // the first message the computer still holds (SPEC §3.8.1)
   // The chat view (src/view.ts): the items are its only state, and it draws everything from them.
-  const acts = actionBoxes(); // each request's "what Aha! did" box (SPEC §7.4)
   const view = chatView({
     col,
     scroller,
-    working: h("div", { class: "tail" }, acts.live, working), // what Aha! did, growing, then "working…"
+    working,
     node,
     resolve: (it, st) => applyState(String(it.id), st),
     dayLabel,
@@ -353,11 +351,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
       const run = typeof it.run === "string" ? it.run : "";
       if (run) {
-        // A request's answer (SPEC §7.4): what it did right above it (it grew there while the request worked),
-        // and its Details line after it, closed, one click to open.
-        acts.done(run, it.record);
+        // A request's answer (SPEC §7.4): what it did is already in the chat, where each thing happened; its
+        // Details line comes after the answer, closed, one click to open.
         const tail = details ? [details.line(it.seq, run)] : [];
-        return h("div", { class: "aha-turn" }, acts.box(run), ...(text.trim() || img ? [el] : []), ...tail);
+        return h("div", { class: "aha-turn" }, ...(text.trim() || img ? [el] : []), ...tail);
       }
       // A background task's note, or an answer from before boxes: the receipt, drawn apart from the model's words.
       const done = receiptLines(it.record);
@@ -378,8 +375,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     }
     if (it.t === "approval") return approvalCard(it);
     // A request's Details line (SPEC §7.4 "Details"): what the model is doing, live, closed until opened.
-    // Where a request's work starts: nothing shows there; what it did grows above its answer (SPEC §7.4).
+    // Where a request's work starts: nothing shows there (SPEC §7.4).
     if (it.t === "steps") return null;
+    // One thing a request did, where it happened (SPEC §7.4 "What Aha! did"): the computer's line, not the model's.
+    if (it.t === "act" && typeof it.text === "string") return h("div", { class: "act", role: "note", "aria-label": "Aha! did" }, h("span", { class: "tick", "aria-hidden": "true" }, "✓"), it.text);
     // A tool line from before Details lines: side info, not part of a reply.
     return null;
   }
@@ -639,7 +638,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     },
     step(task, event) {
       details?.step(task, event);
-      acts.add(task, (event as { did?: unknown }).did);
     },
     stats(s) {
       live.show(s);

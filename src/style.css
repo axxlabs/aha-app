@@ -88,22 +88,12 @@ a { color: inherit; text-underline-offset: 3px; }
 /* The receipt (SPEC §7.4): Aha!'s own record of what a request changed, not the model's words. Not a reply: small,
    in the interface's own type, a dashed rule and a tick, so it never reads as text the model wrote. */
 .aha-turn { display: flex; flex-direction: column; gap: 8px; }
-/* What Aha! did (SPEC §7.4): where a request's work starts, its actions as they happen. The computer's record, not
-   the model's words: the receipt's dashed box, no title, a chevron to collapse it to a count. */
-.acts { position: relative; align-self: flex-start; max-width: 100%; margin: 2px 0; padding: 6px 30px 6px 10px;
-  border: 1px dashed var(--line); border-radius: 10px; font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: var(--muted); overflow-wrap: anywhere; }
-.acts[hidden] { display: none; }
-.acts ul { margin: 0; padding: 0; list-style: none; }
-.acts li { padding-left: 16px; position: relative; }
-.acts li::before { content: "✓"; position: absolute; left: 0; color: var(--ok); font-size: 11px; }
-.acts .acts-count { display: block; }
-.acts .acts-count[hidden], .acts ul[hidden] { display: none; }
-.acts-toggle { position: absolute; top: 3px; right: 4px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px;
-  background: none; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; }
-.acts-toggle:hover, .acts-toggle:focus-visible { background: var(--soft); }
-.acts-toggle .chev { display: inline-block; transition: transform .15s; }
-.acts-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+/* What Aha! did (SPEC §7.4): one line per thing a request did, in the chat where it happened. The computer's
+   record, not the model's words: the receipt's dashed edge, small, muted, a tick. */
+.act { align-self: flex-start; max-width: 100%; margin: 1px 0; padding: 3px 10px; border: 1px dashed var(--line);
+  border-radius: 8px; font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--muted);
+  overflow-wrap: anywhere; }
+.act .tick { color: var(--ok); margin-right: 6px; font-size: 11px; }
 .receipt { align-self: flex-start; max-width: 100%; margin: 2px 0; padding: 6px 10px 6px 10px; border: 1px dashed var(--line);
   border-radius: 10px; font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--muted);
   background: transparent; overflow-wrap: anywhere; }
@@ -415,4 +405,3 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .stats .bar i { background: var(--lv); }
 .stats .temp { color: var(--lv); }
 @media (max-width: 640px) { .stats { display: none; } }
-.tail { display: flex; flex-direction: column; gap: 6px; }

@@ -13,7 +13,8 @@ import { BUILD, ICONS, h, icon, infoPopup } from "./dom";
 import { openDetails } from "./details";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
-import { type TasksUi, everyWords, openTasks } from "./tasks";
+import { type BackgroundTask, type TasksUi, everyWords, openTasks, startedMarks } from "./tasks";
+import type { Part } from "./fold";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
@@ -258,8 +259,23 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     resolve: (it, st) => applyState(String(it.id), st),
     dayLabel,
     busy: () => busy,
+    marks,
     cut: cutBtn,
   });
+  // The background tasks, to mark the topics that started them (null until the computer sent the list).
+  let tasks: BackgroundTask[] | null = null;
+
+  /** A folded topic's icons (SPEC §7.4 "Folding"): a small box for each kind of task note in it, drawn like the
+   * note itself, and the tasks it started, still running or ended. */
+  function marks(p: Part, states: Map<string, string>): Node[] {
+    const heads: Record<string, string> = { update: "A task update", done: "A task done", failed: "A task failed", expired: "A task expired" };
+    const notes = p.notes.map((k) => h("span", { class: `note-mark ${k}`, title: `${heads[k]} in this topic`, role: "img", "aria-label": `${heads[k]} in this topic` }));
+    const started = startedMarks(p.started, states, tasks).map(({ running, count }) => {
+      const words = `Started ${count > 1 ? `${count} background tasks` : "a background task"} here: ${running ? "still running" : "ended"}`;
+      return h("span", { class: `task-mark ${running ? "running" : "ended"}`, title: words, role: "img", "aria-label": words }, icon(ICONS.tasks));
+    });
+    return [...started, ...notes];
+  }
   const toBottom = view.toBottom;
 
   function dayLabel(ts: number): string {
@@ -556,6 +572,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       if (s.computer && !askedAccounts) {
         askedAccounts = true;
         void client.send({ t: "connections_request" });
+        void client.send({ t: "tasks_request" }); // which topics' tasks still run (their fold lines' icons)
       }
       for (const [, el] of view.pendingEntries()) {
         const note = el.querySelector(".note");
@@ -578,6 +595,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     },
     tasks(state) {
       tasksUi?.show(state);
+      tasks = state.items;
+      view.invalidate();
     },
     devices(list) {
       settingsUi?.showDevices(list);

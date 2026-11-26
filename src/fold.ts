@@ -16,7 +16,11 @@ export interface Part {
   title: string;
   folded: boolean; // false for the part still going on
   open: Set<number>; // seqs that stay visible while it's folded
+  notes: string[]; // the kinds of background task notes in it (update, done, failed, expired), in that order
+  started: { id: string; ts: number }[]; // its "Start this background task?" cards
 }
+
+export const NOTE_KINDS = ["update", "done", "failed", "expired"];
 
 const shown = (it: Item) => it.t === "msg" || it.t === "approval" || it.t === "tool"; // aha_local/folding.py SHOWN
 const sameDay = (a: number, b: number) => new Date(a * 1000).toDateString() === new Date(b * 1000).toDateString();
@@ -67,7 +71,10 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
       const before = part[k - 1]; // what you asked, so the open item makes sense on its own
       if (before?.t === "msg" && before.role === "me") open.add(before.seq);
     });
-    return { first, last, ts: part[0].ts, title: String(named?.text ?? "") || firstWords(part), folded: !live, open };
+    const kinds = new Set(part.flatMap((it) => (it.t === "msg" && it.task && typeof it.task === "object" ? [String((it.task as { kind?: unknown }).kind ?? "update")] : [])));
+    const notes = NOTE_KINDS.filter((k) => kinds.has(k));
+    const started = part.filter((it) => it.t === "approval" && it.kind === "task").map((it) => ({ id: String(it.id), ts: it.ts }));
+    return { first, last, ts: part[0].ts, title: String(named?.text ?? "") || firstWords(part), folded: !live, open, notes, started };
   });
 }
 

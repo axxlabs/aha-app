@@ -66,3 +66,22 @@ describe("folding after a break (SPEC §7.4)", () => {
     expect(parts.map((p) => p.folded)).toEqual([true, false]);
   });
 });
+
+describe("a topic's background tasks (SPEC §7.4 \"Folding\")", () => {
+  it("lists the kinds of task notes in it, in order, and the tasks it started", () => {
+    n = 0;
+    const card = { seq: ++n, ts: T + min, t: "approval", kind: "task", id: "c1" } as Item;
+    const other = { seq: ++n, ts: T + 2 * min, t: "approval", kind: "memory", id: "c2" } as Item;
+    const items = [
+      me(T),
+      card,
+      other,
+      { seq: ++n, ts: T + 3 * min, t: "msg", role: "aha", text: "x", task: { kind: "done" } } as Item,
+      { seq: ++n, ts: T + 4 * min, t: "msg", role: "aha", text: "y", task: { kind: "update" } } as Item,
+      { seq: ++n, ts: T + 5 * min, t: "msg", role: "aha", text: "z", task: { kind: "update" } } as Item,
+    ];
+    const [p] = plan(items, new Set(), T + 6 * 60 * min);
+    expect(p.notes).toEqual(["update", "done"]);
+    expect(p.started).toEqual([{ id: "c1", ts: T + min }]);
+  });
+});

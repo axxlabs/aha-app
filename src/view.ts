@@ -3,7 +3,7 @@
 // The chat view (SPEC §7.4). `items` is the only state; draw() derives everything shown from it: the parts of the
 // chat and their fold lines, day labels, what stays open, and what's being sent. Each item's element is made once
 // and kept, so a card keeps what's typed in it. Everything else only changes the state and calls invalidate().
-import { foldLabel, plan } from "./fold";
+import { type Part, foldLabel, plan } from "./fold";
 import type { Item } from "./store";
 
 export interface ViewDeps {
@@ -14,6 +14,7 @@ export interface ViewDeps {
   resolve(it: Item, state: string): void; // show a card's answer on its element
   dayLabel(ts: number): string;
   busy(): boolean; // a task is running: the part going on doesn't fold
+  marks?(p: Part, states: Map<string, string>): Node[]; // small icons on a folded part's line (its background tasks)
   cut?: HTMLElement; // [collapse]: last in the chat, under the latest message, while there's a part going on
   now?: () => number; // seconds (tests)
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
@@ -98,7 +99,7 @@ export function chatView(d: ViewDeps) {
         chevron.className = "chevron";
         chevron.setAttribute("aria-hidden", "true");
         chevron.textContent = open ? "▾" : "▸";
-        line.replaceChildren(chevron, foldLabel(p, t));
+        line.replaceChildren(chevron, ...(d.marks?.(p, states) ?? []), foldLabel(p, t));
         line.setAttribute("aria-expanded", String(open));
         want.push(line);
       }

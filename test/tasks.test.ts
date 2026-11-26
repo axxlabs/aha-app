@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Axxlabs Limited
 // The Tasks panel's words (SPEC §7.4): how often, how long idle.
 import { describe, expect, it } from "vitest";
-import { countWords, everyWords, fromLocalInput, idleLine, idleWords, lastHow, nextWords, toLocalInput } from "../src/tasks";
+import { countWords, everyWords, fromLocalInput, idleLine, idleWords, lastHow, nextWords, startedMarks, toLocalInput } from "../src/tasks";
 
 describe("tasks panel", () => {
   it("says how often a task checks", () => {
@@ -49,5 +49,22 @@ describe("tasks panel", () => {
     expect(idleWords(125 * 60)).toBe("2 h 5 min");
     expect(idleLine({ idle_since: 1000, idle_after: 300, busy: false }, 1000 + 720)).toBe("Idle for 12 min · checks run after 5 min idle");
     expect(idleLine({ idle_since: 1000, idle_after: 300, busy: true }, 5000)).toMatch(/^Working on a request/);
+  });
+});
+
+describe("a topic's started tasks", () => {
+  const states = new Map([["a", "approved"], ["b", "approved"], ["c", "declined"], ["d", "approved"]]);
+  const started = [{ id: "a", ts: 100 }, { id: "b", ts: 200 }, { id: "c", ts: 300 }];
+  it("says which still run, which ended, and nothing for a declined card or before the list came", () => {
+    expect(startedMarks(started, states, [{ card: "a", created: 110 }])).toEqual([
+      { running: true, count: 1 },
+      { running: false, count: 1 },
+    ]);
+    expect(startedMarks(started, states, [])).toEqual([{ running: false, count: 2 }]);
+    expect(startedMarks(started, states, null)).toEqual([]);
+  });
+  it("matches a task kept before cards were, by when it was created", () => {
+    expect(startedMarks([{ id: "d", ts: 1000 }], states, [{ created: 1030 }])).toEqual([{ running: true, count: 1 }]);
+    expect(startedMarks([{ id: "d", ts: 1000 }], states, [{ created: 1000 + 7 * 3600 }])).toEqual([{ running: false, count: 1 }]);
   });
 });

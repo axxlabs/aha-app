@@ -21,6 +21,7 @@ export interface BackgroundTask {
   now?: boolean; // Run now was asked: it checks as soon as the model is free
   running?: boolean; // a check of it runs now
   last_how?: string; // how the last check ended: waiting | notify | unfinished | interrupted
+  card?: string; // the card that started it: the topic it came from (SPEC §7.4 "Folding")
   allowed?: string[]; // what the person allowed up front when it was started: its checks keep it (SPEC §3.4)
 }
 export interface TasksState {
@@ -35,6 +36,26 @@ export interface TasksUi {
 }
 
 const REFRESH_MS = 30_000;
+
+/** A topic's started tasks, for its fold line: what was approved, as running (still in the list) and ended, each
+ * with how many. Nothing until the list came (`tasks` null). A task started before tasks kept their card is
+ * matched by when it was created: within six hours after its card. */
+export function startedMarks(
+  started: { id: string; ts: number }[],
+  states: Map<string, string>,
+  tasks: Pick<BackgroundTask, "card" | "created">[] | null,
+): { running: boolean; count: number }[] {
+  if (!tasks) return [];
+  let running = 0;
+  let ended = 0;
+  for (const s of started) {
+    if (states.get(s.id) !== "approved") continue;
+    const alive = tasks.some((t) => (t.card ? t.card === s.id : t.created >= s.ts && t.created <= s.ts + 6 * 3600));
+    if (alive) running++;
+    else ended++;
+  }
+  return [...(running ? [{ running: true, count: running }] : []), ...(ended ? [{ running: false, count: ended }] : [])];
+}
 
 /** "Every 30 min", "Every 4 hours", "Every day". */
 export function everyWords(seconds: number): string {

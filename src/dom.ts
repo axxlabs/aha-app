@@ -50,11 +50,12 @@ let infoIds = 0;
 
 /** A small button with its popup (SPEC §7.4): shown on hover or focus, kept open by a click or tap (phones have no
  * hover), closed by another click, a tap elsewhere or Escape. Append both, the popup right after the button. The
- * (i) is for help only (a card's "why"); a task note's description has its own button (`about`). */
-export function infoPopup(content: string | Node, label: string, kind: "info" | "about" = "info"): [HTMLButtonElement, HTMLElement] {
-  const tip = h("div", { class: kind === "info" ? "why" : "why task-about", role: "tooltip", id: `info-${++infoIds}` }, content);
-  const face = kind === "info" ? "i" : icon(ICONS.about);
-  const info = h("button", { class: kind, type: "button", "aria-label": label, title: label, "aria-expanded": "false", "aria-describedby": tip.id }, face) as HTMLButtonElement;
+ * (i) is for help only (a card's "why"); a task note's description has its own button (`about`); a topic line's
+ * icons (`mark`) bring their own face. A click on it doesn't reach what it sits in (a fold line opening). */
+export function infoPopup(content: string | Node, label: string, kind: "info" | "about" | "mark" = "info", face?: Node): [HTMLButtonElement, HTMLElement] {
+  const tip = h("div", { class: kind === "info" ? "why" : `why ${kind === "about" ? "task-about" : "mark-tip"}`, role: "tooltip", id: `info-${++infoIds}` }, content);
+  const shown = face ?? (kind === "info" ? "i" : icon(ICONS.about));
+  const info = h("button", { class: kind, type: "button", "aria-label": label, title: kind === "mark" ? "" : label, "aria-expanded": "false", "aria-describedby": tip.id }, shown) as HTMLButtonElement;
   const outside = (e: Event) => {
     if (!info.contains(e.target as Node) && !tip.contains(e.target as Node)) pin(false);
   };
@@ -63,10 +64,15 @@ export function infoPopup(content: string | Node, label: string, kind: "info" | 
     if (open) document.addEventListener("pointerdown", outside, true);
     else document.removeEventListener("pointerdown", outside, true);
   };
-  info.onclick = () => pin(info.getAttribute("aria-expanded") !== "true");
+  info.onclick = (e) => {
+    e.stopPropagation();
+    pin(info.getAttribute("aria-expanded") !== "true");
+  };
   info.onkeydown = (e) => {
+    e.stopPropagation();
     if (e.key === "Escape") pin(false);
   };
+  tip.onclick = (e) => e.stopPropagation();
   return [info, tip];
 }
 

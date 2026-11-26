@@ -17,11 +17,16 @@ export interface Part {
   title: string;
   folded: boolean; // false for the part still going on
   open: Set<number>; // seqs that stay visible while it's folded
-  notes: string[]; // the kinds of background task notes in it (update, done, failed, expired), in that order
-  started: { id: string; ts: number }[]; // its "Start this background task?" cards
+  notes: Note[]; // its background task notes, in order
+  started: { id: string; ts: number; title: string }[]; // its "Start this background task?" cards, with the task's title
 }
 
 export const NOTE_KINDS = ["update", "done", "failed", "expired"];
+export interface Note {
+  kind: string; // update | done | failed | expired
+  title: string; // the task's
+  text: string; // what it said
+}
 
 const shown = (it: Item) => it.t === "msg" || it.t === "approval" || it.t === "tool"; // aha_local/folding.py SHOWN
 const sameDay = (a: number, b: number) => new Date(a * 1000).toDateString() === new Date(b * 1000).toDateString();
@@ -72,9 +77,17 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
       const before = part[k - 1]; // what you asked, so the open item makes sense on its own
       if (before?.t === "msg" && before.role === "me") open.add(before.seq);
     });
-    const kinds = new Set(part.flatMap((it) => (it.t === "msg" && it.task && typeof it.task === "object" ? [String((it.task as { kind?: unknown }).kind ?? "update")] : [])));
-    const notes = NOTE_KINDS.filter((k) => kinds.has(k));
-    const started = part.filter((it) => it.t === "approval" && it.kind === "task").map((it) => ({ id: String(it.id), ts: it.ts }));
+    const notes = part.flatMap((it): Note[] => {
+      if (it.t !== "msg" || !it.task || typeof it.task !== "object") return [];
+      const { kind, title } = it.task as { kind?: unknown; title?: unknown };
+      return [{ kind: NOTE_KINDS.includes(String(kind)) ? String(kind) : "update", title: typeof title === "string" ? title : "", text: String(it.text ?? "") }];
+    });
+    const started = part
+      .filter((it) => it.t === "approval" && it.kind === "task")
+      .map((it) => {
+        const fields = Array.isArray(it.fields) ? (it.fields as { value?: unknown }[]) : [];
+        return { id: String(it.id), ts: it.ts, title: String(fields[0]?.value ?? "") }; // "Waiting for"
+      });
     return { first, last, ts: part[0].ts, title: String(named?.text ?? "") || firstWords(part), folded: !live, open, notes, started };
   });
 }
@@ -95,4 +108,14 @@ export function dayWords(ts: number, now: number, format: DateFormat = "short"):
   if (days === 1) return "Yesterday";
   const date = formatDate(d, format, n);
   return days > 1 && days < 7 ? `Last week · ${date}` : date;
+}
+
+/** A result's gist: its first words as plain text, at most `max` characters. */
+export function gist(text: string, max = 140): string {
+  const plain = text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // links: their words
+    .replace(/[*_`#>]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain.length > max ? `${plain.slice(0, max - 1).replace(/\s+\S*$/, "")}…` : plain;
 }

@@ -29,7 +29,7 @@ export function chatView(d: ViewDeps) {
   const els = new Map<number, HTMLElement>();
   const pending = new Map<string, HTMLElement>(); // sent from here, not echoed back yet
   const expanded = new Set<number>(); // folded parts the person opened, by their first item
-  const foldLines = new Map<number, HTMLButtonElement>();
+  const foldLines = new Map<number, HTMLElement>();
   const dayLines = new Map<string, HTMLElement>();
   const answered = new Set<number>(); // cards already shown as answered
   const now = d.now ?? (() => Date.now() / 1000);
@@ -53,19 +53,29 @@ export function chatView(d: ViewDeps) {
     return el;
   }
 
-  function foldLine(first: number): HTMLButtonElement {
+  // A row acting as a button, not a <button>: its icons are buttons of their own (their popups), and a button
+  // can't hold buttons.
+  function foldLine(first: number): HTMLElement {
     let line = foldLines.get(first);
     if (!line) {
-      line = document.createElement("button");
-      line.type = "button";
+      line = document.createElement("div");
       line.className = "fold";
-      line.onclick = () => {
+      line.setAttribute("role", "button");
+      line.tabIndex = 0;
+      const toggle = () => {
         if (expanded.has(first)) expanded.delete(first);
         else {
           expanded.add(first);
           scrollTo = first; // opened: its start comes to the top, to read it from the beginning
         }
         invalidate();
+      };
+      line.onclick = toggle;
+      line.onkeydown = (e) => {
+        if (e.target === line && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          toggle();
+        }
       };
       foldLines.set(first, line);
     }
@@ -119,7 +129,7 @@ export function chatView(d: ViewDeps) {
         const time = document.createElement("time");
         time.textContent = foldTime(p);
         line.replaceChildren(chevron, title, marks, time);
-        line.title = `${p.title} · ${day} ${time.textContent}`;
+        line.setAttribute("aria-label", `${p.title} · ${day} ${time.textContent}`);
         line.setAttribute("aria-expanded", String(open));
         want.push(line);
       }

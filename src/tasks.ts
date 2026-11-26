@@ -37,38 +37,35 @@ export interface TasksUi {
 
 const REFRESH_MS = 30_000;
 
-/** The cards whose task still runs: each task in the list belongs to one card, the one that started it. A task
- * kept before tasks kept their card is matched to the last approved task card before it was created, within six
- * hours; never one card for two tasks, never one task for two cards. null until the list came. */
-export function runningCards(
+/** The cards whose task still runs, each with its task: every task in the list belongs to one card, the one that
+ * started it. A task kept before tasks kept their card is matched to the last approved task card before it was
+ * created, within six hours; never one card for two tasks, never one task for two cards. null until the list came. */
+export function runningCards<T extends Pick<BackgroundTask, "card" | "created">>(
   cards: { id: string; ts: number }[],
   states: Map<string, string>,
-  tasks: Pick<BackgroundTask, "card" | "created">[] | null,
-): Set<string> | null {
+  tasks: T[] | null,
+): Map<string, T> | null {
   if (!tasks) return null;
   const approved = cards.filter((c) => states.get(c.id) === "approved").sort((a, b) => a.ts - b.ts);
-  const running = new Set(tasks.flatMap((t) => (t.card ? [t.card] : [])));
   const known = new Set(approved.map((c) => c.id));
+  const running = new Map<string, T>();
+  for (const t of tasks) if (t.card && known.has(t.card)) running.set(t.card, t);
   // The older tasks, oldest first, each taking the latest free card before it.
   for (const t of tasks.filter((t) => !t.card).sort((a, b) => a.created - b.created)) {
     const card = approved.filter((c) => c.ts <= t.created && t.created - c.ts <= 6 * 3600 && !running.has(c.id)).pop();
-    if (card) running.add(card.id);
+    if (card) running.set(card.id, t);
   }
-  return new Set([...running].filter((id) => known.has(id)));
+  return running;
 }
 
-/** A topic's started tasks, for its fold line: what was approved, as running and ended, each with how many.
- * Nothing until the list came (`running` null). */
-export function startedMarks(
-  started: { id: string; ts: number }[],
-  states: Map<string, string>,
-  running: Set<string> | null,
-): { running: boolean; count: number }[] {
+/** A topic's started tasks, for its fold line: what was approved, the running ones and the ended ones, each
+ * group with its cards. Nothing until the list came (`running` null). */
+export function startedMarks<C extends { id: string }>(started: C[], states: Map<string, string>, running: Map<string, unknown> | null): { running: boolean; cards: C[] }[] {
   if (!running) return [];
   const approved = started.filter((s) => states.get(s.id) === "approved");
-  const on = approved.filter((s) => running.has(s.id)).length;
-  const off = approved.length - on;
-  return [...(on ? [{ running: true, count: on }] : []), ...(off ? [{ running: false, count: off }] : [])];
+  const on = approved.filter((s) => running.has(s.id));
+  const off = approved.filter((s) => !running.has(s.id));
+  return [...(on.length ? [{ running: true, cards: on }] : []), ...(off.length ? [{ running: false, cards: off }] : [])];
 }
 
 /** "Every 30 min", "Every 4 hours", "Every day". */

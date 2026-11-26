@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 import { describe, expect, it } from "vitest";
-import { dayWords, plan } from "../src/fold";
+import { dayWords, gist, plan } from "../src/fold";
 import type { Item } from "../src/store";
 
 const T = new Date(2026, 10, 24, 9, 0).getTime() / 1000; // 24 Nov, 09:00 local
@@ -70,19 +70,26 @@ describe("folding after a break (SPEC §7.4)", () => {
 describe("a topic's background tasks (SPEC §7.4 \"Folding\")", () => {
   it("lists the kinds of task notes in it, in order, and the tasks it started", () => {
     n = 0;
-    const card = { seq: ++n, ts: T + min, t: "approval", kind: "task", id: "c1" } as Item;
+    const card = { seq: ++n, ts: T + min, t: "approval", kind: "task", id: "c1", fields: [{ label: "Waiting for", value: "Parcel" }] } as Item;
     const other = { seq: ++n, ts: T + 2 * min, t: "approval", kind: "memory", id: "c2" } as Item;
     const items = [
       me(T),
       card,
       other,
-      { seq: ++n, ts: T + 3 * min, t: "msg", role: "aha", text: "x", task: { kind: "done" } } as Item,
-      { seq: ++n, ts: T + 4 * min, t: "msg", role: "aha", text: "y", task: { kind: "update" } } as Item,
-      { seq: ++n, ts: T + 5 * min, t: "msg", role: "aha", text: "z", task: { kind: "update" } } as Item,
+      { seq: ++n, ts: T + 3 * min, t: "msg", role: "aha", text: "x", task: { kind: "done", title: "Sam" } } as Item,
+      { seq: ++n, ts: T + 4 * min, t: "msg", role: "aha", text: "y", task: { kind: "update", title: "Parcel" } } as Item,
     ];
     const [p] = plan(items, new Set(), T + 6 * 60 * min);
-    expect(p.notes).toEqual(["update", "done"]);
-    expect(p.started).toEqual([{ id: "c1", ts: T + min }]);
+    expect(p.notes).toEqual([
+      { kind: "done", title: "Sam", text: "x" },
+      { kind: "update", title: "Parcel", text: "y" },
+    ]);
+    expect(p.started).toEqual([{ id: "c1", ts: T + min, title: "Parcel" }]);
+  });
+
+  it("gives a result's gist: plain words, cut at a word", () => {
+    expect(gist("**Sam replied**: see [the email](https://x.y/z).\n\n# More")).toBe("Sam replied: see the email. More");
+    expect(gist("one two three four", 12)).toBe("one two…");
   });
 });
 

@@ -54,25 +54,24 @@ describe("tasks panel", () => {
 
 describe("a topic's started tasks", () => {
   const states = new Map([["a", "approved"], ["b", "approved"], ["c", "declined"], ["d", "approved"], ["e", "approved"]]);
+  const ids = (m: Map<string, unknown> | null) => [...(m?.keys() ?? [])].sort();
   it("says which still run, which ended, and nothing for a declined card or before the list came", () => {
     const started = [{ id: "a", ts: 100 }, { id: "b", ts: 200 }, { id: "c", ts: 300 }];
-    const running = runningCards(started, states, [{ card: "a", created: 110 }]);
+    const task = { card: "a", created: 110 };
+    const running = runningCards(started, states, [task]);
+    expect(running?.get("a")).toBe(task);
     expect(startedMarks(started, states, running)).toEqual([
-      { running: true, count: 1 },
-      { running: false, count: 1 },
+      { running: true, cards: [started[0]] },
+      { running: false, cards: [started[1]] },
     ]);
-    expect(startedMarks(started, states, runningCards(started, states, []))).toEqual([{ running: false, count: 2 }]);
+    expect(startedMarks(started, states, runningCards(started, states, []))).toEqual([{ running: false, cards: [started[0], started[1]] }]);
     expect(startedMarks(started, states, runningCards(started, states, null))).toEqual([]);
   });
   it("gives each older task (no card kept) one card only: the last approved before it", () => {
     const cards = [{ id: "b", ts: 1000 }, { id: "c", ts: 1500 }, { id: "d", ts: 2000 }, { id: "e", ts: 3000 }];
-    // One task, created after d: only d runs, not every card in the six hours before it.
-    expect([...(runningCards(cards, states, [{ created: 2030 }]) ?? [])]).toEqual(["d"]);
-    // Two tasks: each takes its own card.
-    expect([...(runningCards(cards, states, [{ created: 2030 }, { created: 2040 }]) ?? [])].sort()).toEqual(["b", "d"]); // c was declined
-    // A card that kept its task isn't taken by an older one.
-    expect([...(runningCards(cards, states, [{ card: "e", created: 3010 }, { created: 3020 }]) ?? [])].sort()).toEqual(["d", "e"]);
-    // Too long after any card: none.
+    expect(ids(runningCards(cards, states, [{ created: 2030 }]))).toEqual(["d"]); // not every card in the six hours
+    expect(ids(runningCards(cards, states, [{ created: 2030 }, { created: 2040 }]))).toEqual(["b", "d"]); // c was declined
+    expect(ids(runningCards(cards, states, [{ card: "e", created: 3010 }, { created: 3020 }]))).toEqual(["d", "e"]);
     expect(runningCards(cards, states, [{ created: 3000 + 7 * 3600 }])?.size).toBe(0);
   });
 });

@@ -14,7 +14,7 @@ import { openDetails } from "./details";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
 import { type BackgroundTask, type TasksUi, everyWords, openTasks, runningCards, startedMarks } from "./tasks";
-import { type Part, dayWords } from "./fold";
+import { NOTE_KINDS, type Part, dayWords, gist } from "./fold";
 import { render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
@@ -271,22 +271,37 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   let tasks: BackgroundTask[] | null = null;
 
   /** Which task cards' tasks still run, over the whole chat (a task belongs to one card only). */
-  function running(states: Map<string, string>): Set<string> | null {
+  function running(states: Map<string, string>): Map<string, BackgroundTask> | null {
     const cards = [...view.items.values()].filter((it) => it.t === "approval" && it.kind === "task").map((it) => ({ id: String(it.id), ts: it.ts }));
     return runningCards(cards, states, tasks);
   }
 
   /** A folded topic's icons (SPEC §7.4 "Folding"): a small box for each kind of task note in it, drawn like the
-   * note itself, and the tasks it started, still running or ended. */
+   * note itself, and the tasks it started, still running or ended. Each is a button with the (i)'s popup: which
+   * task, and the gist of what it found. */
   function marks(p: Part, states: Map<string, string>): Node[] {
-    const heads: Record<string, string> = { update: "A task update", done: "A task done", failed: "A task failed", expired: "A task expired" };
-    const notes = p.notes.map((k) => h("span", { class: `note-mark ${k}`, title: `${heads[k]} in this topic`, role: "img", "aria-label": `${heads[k]} in this topic` }));
-    const started = startedMarks(p.started, states, running(states)).map(({ running, count }) => {
-      const words = `Started ${count > 1 ? `${count} background tasks` : "a background task"} here: ${running ? "still running" : "ended"}`;
-      return h("span", { class: `task-mark ${running ? "running" : "ended"}`, title: words, role: "img", "aria-label": words }, icon(ICONS.tasks));
+    const mark = (face: Node, label: string, ...lines: Node[]) => h("span", { class: "mark-wrap" }, ...infoPopup(h("div", {}, ...lines), label, "mark", face));
+    const line = (title: string, words: string) => h("p", {}, h("b", {}, title || "A background task"), words ? h("small", {}, words) : "");
+    const run = running(states);
+    const started = startedMarks(p.started, states, run).map(({ running: on, cards }) => {
+      const head = `Started here: ${cards.length > 1 ? `${cards.length} background tasks` : "a background task"}, ${on ? "still running" : "ended"}`;
+      const lines = cards.map((c) => {
+        const t = run?.get(c.id);
+        return line(t?.title || c.title, !on ? "" : t?.last ? `Last check: ${gist(t.last)}` : "Not checked yet");
+      });
+      return mark(h("span", { class: `task-mark ${on ? "running" : "ended"}` }, icon(ICONS.tasks)), head, h("header", {}, head), ...lines);
+    });
+    const heads: Record<string, string> = { update: "Task update", done: "Task done", failed: "Task failed", expired: "Task expired" };
+    const notes = NOTE_KINDS.flatMap((k) => {
+      const of = p.notes.filter((n) => n.kind === k);
+      if (!of.length) return [];
+      const head = of.length > 1 ? `${heads[k]} ×${of.length}` : heads[k];
+      // The latest three, newest last, as in the chat.
+      return [mark(h("span", { class: `note-mark ${k}` }), `${head} in this topic`, h("header", { class: k }, head), ...of.slice(-3).map((n) => line(n.title, gist(n.text))))];
     });
     return [...started, ...notes];
   }
+
   const toBottom = view.toBottom;
 
   function dayLabel(ts: number): string {

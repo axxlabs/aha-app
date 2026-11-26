@@ -17,6 +17,7 @@ import { type MemoryUi, openMemory } from "./memory";
 import { type BackgroundTask, type TasksUi, everyWords, openTasks, runningCards, startedMarks } from "./tasks";
 import { NOTE_KINDS, type Part, dayWords, gist } from "./fold";
 import { render } from "./markdown";
+import { receipt, receiptLines } from "./receipt";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
 
@@ -343,14 +344,20 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       return el;
     }
     if (it.t === "msg") {
+      const text = String(it.text ?? "");
       const el = h("div", { class: "aha" });
-      el.innerHTML = render(String(it.text ?? ""), accounts, client.settings.dates); // html disabled; labels
+      el.innerHTML = render(text, accounts, client.settings.dates); // html disabled; labels
       const img = it.image as { mime?: string; b64?: string } | undefined;
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
+      // What the request changed, from its tool calls (SPEC §7.4 "Receipt"): Aha!'s own record, drawn apart from
+      // the model's words, so nothing done is left to the model to mention.
+      const done = receiptLines(it.record);
+      const rec = done.length ? receipt(done) : null;
+      const body = rec && !text.trim() && !img ? rec : rec ? h("div", { class: "aha-turn" }, el, rec) : el;
       const note = taskNote(it.task);
       if (note) {
         // A background task's news (SPEC §7.4 "Task notes"): a box with a small title saying which task ran.
-        const box = h("section", { class: `task-note ${note.kind}`, "aria-label": `${note.head}: ${note.title}` }, h("header", {}, h("b", {}, note.head), h("span", {}, note.title)), el);
+        const box = h("section", { class: `task-note ${note.kind}`, "aria-label": `${note.head}: ${note.title}` }, h("header", {}, h("b", {}, note.head), h("span", {}, note.title)), body);
         // Its (i): the task's full description, what each check does and how often (SPEC §7.4 "Task notes").
         if (note.prompt) {
           const about = h("div", {}, h("b", {}, note.title), h("p", {}, note.prompt), note.every ? h("small", {}, everyWords(note.every)) : "");
@@ -358,7 +365,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
         }
         return box;
       }
-      return el;
+      return body;
     }
     if (it.t === "approval") return approvalCard(it);
     // A request's Details line (SPEC §7.4 "Details"): what the model is doing, live, closed until opened.

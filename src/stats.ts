@@ -32,13 +32,12 @@ export function statsChips(s: Stats): Chip[] {
 }
 
 function chip(c: Chip): HTMLElement {
-  const parts: HTMLElement[] = [h("b", {}, c.label)];
-  if (c.load !== undefined) {
-    const fill = h("i", { style: `width:${Math.max(0, Math.min(100, c.load))}%` });
-    parts.push(h("span", { class: `bar ${loadLevel(c.load)}`, "aria-hidden": "true" }, fill));
-  }
-  if (c.temp !== undefined) parts.push(h("span", { class: `temp ${tempLevel(c.temp)}` }, `${c.temp}°`));
-  return h("span", { class: "chip", title: c.title, "aria-label": c.title }, ...parts);
+  // Stacked in a grid (the chip itself is `display: contents`), so each row has its three cells, empty or not, and
+  // each cell carries the hover text.
+  const tip = { title: c.title };
+  const bar = c.load !== undefined ? h("span", { class: `bar ${loadLevel(c.load)}`, "aria-hidden": "true", ...tip }, h("i", { style: `width:${Math.max(0, Math.min(100, c.load))}%` })) : h("span", tip);
+  const temp = c.temp !== undefined ? h("span", { class: `temp ${tempLevel(c.temp)}`, ...tip }, `${c.temp}°`) : h("span", { class: "temp", ...tip });
+  return h("span", { class: "chip", "aria-label": c.title }, h("b", tip, c.label), bar, temp);
 }
 
 /** The panel: hidden until the first reading, and again when the computer goes offline. */

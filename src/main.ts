@@ -232,7 +232,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   let photo: Photo | null = null;
   const form = h("form", {}, photoBtn, fileInput, input, sendBtn);
   // Fold the conversation going on now, on every device; the next message starts a new part (SPEC §7.4).
-  const cutBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold this conversation away: what you write next starts a new topic" }, "[collapse into new topic]");
+  const cutBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold this conversation away: what you write next starts a new topic" }, "[close current conversation into new topic]");
   cutBtn.onclick = () => void client.send({ t: "cut" });
   const collapseAllBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold every topic you opened" }, "[collapse all]");
   collapseAllBtn.onclick = () => view.collapseAll();

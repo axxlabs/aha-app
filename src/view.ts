@@ -15,7 +15,7 @@ export interface ViewDeps {
   dayLabel(ts: number): string;
   busy(): boolean; // a task is running: the part going on doesn't fold
   marks?(p: Part, states: Map<string, string>): Node[]; // small icons on a folded part's line (its background tasks)
-  cut?: HTMLElement; // [collapse into new topic]: shown while there's a part going on
+  cut?: HTMLElement; // [close current conversation into new topic]: shown while there's a part going on
   collapseAll?: HTMLElement; // [collapse all]: shown while a folded part is open; folds them all again
   actions?: HTMLElement; // the row holding both, last in the chat, under the latest message (when one shows)
   now?: () => number; // seconds (tests)

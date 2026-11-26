@@ -396,7 +396,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       const hidden: Record<string, string> = f.kind === "taps" ? { hidden: "" } : {}; // a check card's taps are made on the screenshot
       const cls = f.kind === "longtext" ? "long" : f.kind === "bool" ? "tick" : "";
       dl.append(h("dt", cls === "tick" ? { class: "tick", ...hidden } : hidden, f.label));
-      const dd = h("dd", cls ? { class: cls, ...hidden } : hidden, f.value);
+      // A tick (a task's permission) reads as allowed; only Edit makes it a checkbox, to revoke it.
+      const dd = h("dd", cls ? { class: cls, ...hidden } : hidden, cls === "tick" ? (f.value === "true" ? "✓" : "—") : f.value);
       dl.append(dd);
       inputs.push(null);
     });
@@ -448,8 +449,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     card.append(dl, actions, stateEl);
     let editing = false;
     // A sign-in card's inputs are open from the start: the person types into them (SPEC §5.3). A check card's
-    // only input is the screenshot. Ticks (a task's permissions) are always open: the person unticks what it may
-    // not do without asking.
+    // only input is the screenshot.
     const openInputs = it.kind === "signin" || it.kind === "check";
     const inputFor = (f: (typeof fields)[number]): HTMLInputElement | HTMLTextAreaElement => {
       if (f.kind === "longtext") {
@@ -484,7 +484,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     const edit = buttons.length === 3 ? h("button", { type: "button" }, buttons[1]) : null;
     const decline = h("button", { type: "button" }, buttons[buttons.length - 1] ?? "Decline");
     actions.append(approve, ...(edit ? [edit] : []), decline);
-    const ticks = fields.some((f) => f.kind === "bool");
     showTaps();
     const disable = (text: string) => {
       for (const b of actions.querySelectorAll("button")) b.setAttribute("disabled", "");
@@ -492,7 +491,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     };
     approve.onclick = async () => {
       const values = fields.map(valueOf);
-      const sent = await client.send({ t: "approval_reply", id, decision: "approve", ...(editing || ticks ? { values } : {}) });
+      const sent = await client.send({ t: "approval_reply", id, decision: "approve", ...(editing ? { values } : {}) });
       fields.forEach((f, i) => {
         const inp = inputs[i];
         if (f.kind === "secret" && inp) inp.value = "";
@@ -507,19 +506,13 @@ async function chat(store: Store, identity: Identity): Promise<void> {
         editing = true;
         edit.setAttribute("disabled", "");
         [...dl.querySelectorAll("dd")].forEach((dd, i) => {
-          if (!fields[i].editable || inputs[i]) return;
+          if (!fields[i].editable && fields[i].kind !== "bool") return; // a tick: Edit can revoke it
           const inp = inputFor(fields[i]);
           inputs[i] = inp;
           dd.replaceChildren(inp);
         });
         inputs.find(Boolean)?.focus();
       };
-    if (!openInputs)
-      [...dl.querySelectorAll("dd")].forEach((dd, i) => {
-        if (fields[i].kind !== "bool") return;
-        inputs[i] = inputFor(fields[i]);
-        dd.replaceChildren(inputs[i]);
-      });
     if (openInputs) {
       editing = true;
       [...dl.querySelectorAll("dd")].forEach((dd, i) => {

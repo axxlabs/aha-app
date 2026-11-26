@@ -228,7 +228,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
         {},
         h("h4", {}, "Clear"),
         h("div", { class: "row" }, h("span", {}, "Chat history", h("small", {}, "From your computer and all your devices. Memories, tasks and sign-ins stay.")), clearHistory),
-        h("div", { class: "row" }, h("span", {}, "Browser data", h("small", {}, "Everything Aha!'s browser remembers: signs you out of every site. Trusted sites stay.")), clearBrowser),
+        h("div", { class: "row" }, h("span", {}, "Browser data", h("small", {}, "Everything Aha!'s browser remembers: every site is forgotten, with its sign-in, saved login and trust.")), clearBrowser),
       ),
       h(
         "section",
@@ -315,7 +315,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
     if (e.key === "Enter") trustBtn.click();
   });
   clearBrowser.onclick = async () => {
-    if (!confirm("Clear everything Aha!'s browser remembers? You'll be signed out of every site and saved logins are deleted. Trusted sites stay.")) return;
+    if (!confirm("Clear everything Aha!'s browser remembers? Every site is forgotten: you'll be signed out everywhere, saved logins are deleted and no site stays trusted.")) return;
     clearBrowser.disabled = true;
     if (!(await client.send({ t: "browser_clear" }))) {
       clearBrowser.disabled = false;
@@ -408,7 +408,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
       );
     },
     showBrowser(list) {
-      clearBrowser.disabled = !list.some((s) => !s.trusted || s.signed_in || s.login_saved);
+      clearBrowser.disabled = !list.length;
       clearBrowser.textContent = "Clear browser";
       trustBtn.disabled = false;
       sites.replaceChildren(
@@ -416,17 +416,25 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
           ? list.map((s) => {
               const forget = h("button", { class: "btn", type: "button" }, "Forget");
               forget.onclick = async () => {
-                if (!confirm(`Forget ${s.site}? You'll be signed out there${s.login_saved ? " and its saved login is deleted" : ""}.`)) return;
+                if (!confirm(`Forget ${s.site}? You'll be signed out there${s.login_saved ? ", its saved login is deleted" : ""}${s.trusted ? ", and it's no longer trusted" : ""}.`)) return;
                 forget.setAttribute("disabled", "");
                 if (!(await client.send({ t: "browser_forget", site: s.site }))) forget.removeAttribute("disabled");
               };
-              const forgetLogin = h("button", { class: "btn", type: "button" }, "Forget login");
-              forgetLogin.onclick = async () => {
-                if (!confirm(`Forget the saved login for ${s.site}?`)) return;
-                forgetLogin.setAttribute("disabled", "");
-                if (!(await client.send({ t: "login_forget", site: s.site }))) forgetLogin.removeAttribute("disabled");
+              // A saved login (SPEC §5.8): a toggle that can only be turned off; a login card saves one.
+              const login = h("input", { type: "checkbox", "aria-label": `Saved login for ${s.site}` }) as HTMLInputElement;
+              login.checked = true;
+              login.onchange = async () => {
+                if (!confirm(`Forget the saved login for ${s.site}?`)) {
+                  login.checked = true;
+                  return;
+                }
+                login.disabled = true;
+                if (!(await client.send({ t: "login_forget", site: s.site }))) {
+                  login.checked = true;
+                  login.disabled = false;
+                }
               };
-              const tags = [s.signed_in ? "signed in" : "", s.login_saved ? "login saved" : ""].filter(Boolean);
+              const tags = [s.signed_in ? "signed in" : ""].filter(Boolean);
               // Trusted (SPEC §5.7): Aha! acts on this site without asking.
               const trust = h("input", { type: "checkbox", "aria-label": `Trust ${s.site}` }) as HTMLInputElement;
               trust.checked = s.trusted;
@@ -441,7 +449,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
                 "div",
                 { class: "row" },
                 h("span", {}, s.site, ...(tags.length ? [h("small", {}, tags.join(" · "))] : [])),
-                h("span", { class: "site-actions" }, h("label", { class: "trust" }, trust, "Trusted"), ...(s.login_saved ? [forgetLogin] : []), forget),
+                h("span", { class: "site-actions" }, h("label", { class: "trust" }, trust, "Trusted"), ...(s.login_saved ? [h("label", { class: "trust" }, login, "Login saved")] : []), forget),
               );
             })
           : [h("p", { class: "fine" }, "Nothing yet.")]),

@@ -531,6 +531,12 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       });
     }
     cards.set(id, { el: card, resolved: false });
+    // A background task's check asks (SPEC §7.4): the card is drawn in that task's box, like its notes.
+    const task = it.task && typeof it.task === "object" ? (it.task as { title?: unknown }) : null;
+    if (task) {
+      const title = typeof task.title === "string" ? task.title : "";
+      return h("section", { class: "task-note asks", "aria-label": `Task asks: ${title}` }, h("header", {}, h("b", {}, "Task asks"), h("span", {}, title)), card);
+    }
     return card;
   }
 

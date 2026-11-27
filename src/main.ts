@@ -294,7 +294,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       });
       return mark(h("span", { class: `task-mark ${on ? "running" : "ended"}` }, icon(ICONS.tasks)), head, h("header", {}, head), ...lines);
     });
-    const heads: Record<string, string> = { update: "Task update", done: "Task done", failed: "Task failed", expired: "Task expired" };
+    const heads: Record<string, string> = { update: "Task update", done: "Task done", failed: "Task failed" };
     const notes = NOTE_KINDS.flatMap((k) => {
       const of = p.notes.filter((n) => n.kind === k);
       if (!of.length) return [];
@@ -331,7 +331,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   function taskNote(task: unknown): { kind: string; head: string; title: string; prompt: string; every: number } | null {
     if (!task || typeof task !== "object") return null;
     const { kind, title, prompt, every } = task as { kind?: unknown; title?: unknown; prompt?: unknown; every?: unknown };
-    const heads: Record<string, string> = { update: "Task update", done: "Task done", failed: "Task failed", expired: "Task expired" };
+    const heads: Record<string, string> = { update: "Task update", done: "Task done", failed: "Task failed" };
     const k = typeof kind === "string" && kind in heads ? kind : "update";
     return { kind: k, head: heads[k], title: typeof title === "string" ? title : "", prompt: typeof prompt === "string" ? prompt : "", every: typeof every === "number" && every > 0 ? every : 0 };
   }

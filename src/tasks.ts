@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 // Tasks (SPEC §3.4 "Background tasks", §7.4): what Aha! waits for and checks on its own, in a panel of its own.
-// Each task with how often it checks, the next check and until when, what the last check found, and Cancel; at
+// Each task with how often it checks, the next check and what ends it, what the last check found, and Cancel; at
 // the top, the idle time the checks wait for (they run only while nobody uses Aha!).
 import type { Client } from "./client";
 import { ICONS, h, icon, openSheet } from "./dom";
@@ -15,7 +15,6 @@ export interface BackgroundTask {
   done_when?: string; // what ends it, or "never" (SPEC §3.4)
   every: number; // seconds
   at?: string[]; // times of day it checks, every day ("08:00"); none: every `every` seconds
-  until: number | null; // epoch seconds; null = no end
   next: number;
   last: string;
   checks: number;
@@ -213,7 +212,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
     const editBtn = h("button", { class: "run", type: "button" }, "Edit");
     const foot = h("div", { class: "task-foot" }, how, editBtn, run);
     editBtn.onclick = () => {
-      // Every field (SPEC §7.4): what it waits for, what it checks, how often, the next check and until when.
+      // Every field (SPEC §7.4): what it waits for, what it checks, what ends it, how often and the next check.
       const field = (label: string, input: HTMLElement) => h("label", {}, h("span", {}, label), input);
       const title = h("input", { type: "text", value: t.title, maxlength: "120" }) as HTMLInputElement;
       const box = h("textarea", { rows: "6", maxlength: "2000" }, t.prompt) as HTMLTextAreaElement;
@@ -221,11 +220,6 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
       const every = h("input", { type: "number", min: "5", step: "1", value: String(Math.round(t.every / 60)) }) as HTMLInputElement;
       const at = h("input", { type: "text", value: (t.at ?? []).join(", "), placeholder: "08:00, 18:00", autocapitalize: "off" }) as HTMLInputElement;
       const nextAt = h("input", { type: "datetime-local", value: toLocalInput(Math.max(t.next, Date.now() / 1000)) }) as HTMLInputElement;
-      const until = h("input", { type: "datetime-local", value: t.until === null ? "" : toLocalInput(t.until) }) as HTMLInputElement;
-      const noEnd = h("input", { type: "checkbox" }) as HTMLInputElement;
-      noEnd.checked = t.until === null;
-      until.disabled = noEnd.checked;
-      noEnd.onchange = () => (until.disabled = noEnd.checked);
       // What it may do without asking (SPEC §7.4): the person changes it here, their own action, so no card.
       const g: Grant = { open: [], type: [], search: false, email: [], drafts: false, calendar_add: false, calendar_change: false, ...t.grant };
       const types = h("input", { type: "text", value: g.type.join(", "), placeholder: "fedex.com, royalmail.com", autocapitalize: "off" }) as HTMLInputElement;
@@ -262,7 +256,6 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
         field("How it checks", box),
         field("Done when (or never)", doneWhen),
         h("div", { class: "task-edit-row" }, field("Check every (minutes)", every), field("Or at times of day", at), field("Next check", nextAt)),
-        h("div", { class: "task-edit-row" }, field("Until", until), h("label", { class: "check" }, noEnd, h("span", {}, "No end"))),
         allowed,
         error,
         h("div", { class: "task-edit-actions" }, back, save),
@@ -277,7 +270,6 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
       save.onclick = async () => {
         const minutes = Number(every.value);
         const next = fromLocalInput(nextAt.value);
-        const end = noEnd.checked ? null : fromLocalInput(until.value);
         const why = !title.value.trim()
           ? "Say what it waits for."
           : !box.value.trim()
@@ -288,11 +280,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
               ? "Check at most every 5 minutes."
               : next === null
                 ? "Choose the next check."
-                : !noEnd.checked && end === null
-                  ? "Choose when it ends, or No end."
-                  : end !== null && next >= end
-                    ? "The next check must be before it ends."
-                    : "";
+                : "";
         error.textContent = why;
         error.hidden = !why;
         if (why) return;
@@ -306,7 +294,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
           calendar_add: adds.checked,
           calendar_change: changes.checked,
         };
-        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), done_when: doneWhen.value.trim(), at: at.value.trim(), every: Math.round(minutes) * 60, next, until: end, grant });
+        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), done_when: doneWhen.value.trim(), at: at.value.trim(), every: Math.round(minutes) * 60, next, grant });
         if (sent) done(); // the computer sends the new list
         else save.removeAttribute("disabled");
       };
@@ -327,8 +315,6 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
         h("dd", {}, t.at?.length ? `Every day at ${t.at.join(" and ")}` : everyWords(t.every)),
         h("dt", {}, "Next"),
         h("dd", {}, next),
-        h("dt", {}, "Until"),
-        h("dd", {}, t.until === null ? "No end" : when(t.until)),
         ...(t.allowed?.length ? [h("dt", {}, "Allowed"), h("dd", {}, h("ul", { class: "allowed" }, ...t.allowed.map((a) => h("li", {}, a))))] : []),
       ),
       lastCheck(t, checks),

@@ -20,9 +20,9 @@ export interface Part {
   started: { id: string; ts: number; title: string }[]; // its "Start this background task?" cards, with the task's title
 }
 
-export const NOTE_KINDS = ["update", "done", "failed", "expired"];
+export const NOTE_KINDS = ["update", "done", "failed"];
 export interface Note {
-  kind: string; // update | done | failed | expired
+  kind: string; // update | done | failed
   title: string; // the task's
   text: string; // what it said
 }

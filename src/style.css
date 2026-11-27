@@ -146,6 +146,8 @@ a { color: inherit; text-underline-offset: 3px; }
 .card input { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 5px 8px; }
 .card input[type="checkbox"] { width: 22px; height: 22px; padding: 0; accent-color: var(--accent, currentColor); }
 .card .actions { display: flex; gap: 8px; }
+.card .always { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.card .always input { width: 18px; height: 18px; margin: 0; }
 .card .actions button { flex: 1; min-height: 42px; border-radius: 999px; border: 1.5px solid var(--line);
   background: transparent; font-weight: 700; }
 .card .actions button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }

@@ -24,24 +24,9 @@ export interface BackgroundTask {
   running?: boolean; // a check of it runs now
   last_how?: string; // how the last check ended: waiting | notify | ended_early
   card?: string; // the card that started it: the topic it came from (SPEC §7.4 "Folding")
-  allowed?: string[]; // what the person allowed up front when it was started: its checks keep it (SPEC §3.4)
-  grant?: Grant; // the same, to edit (SPEC §7.4)
-}
-/** What a task may do without asking, each read apart from its write (SPEC §5.2 "Allowed up front"). */
-export interface Grant {
-  open: string[]; // sites whose pages it reads
-  type: string[]; // sites it types on (and opens)
-  search: boolean;
-  email: string[]; // people it may send email to, or invite
-  drafts: boolean;
-  calendar_add: boolean;
-  calendar_change: boolean;
+  allowed?: { key: string; label: string }[]; // what its cards were allowed "always", in its checks (SPEC §5.3)
 }
 
-/** "fedex.com, royalmail.com" → ["fedex.com", "royalmail.com"]: commas, spaces or new lines between. */
-export function listOf(text: string): string[] {
-  return [...new Set(text.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean))];
-}
 export interface TasksState {
   items: BackgroundTask[];
   idle_since: number;
@@ -220,32 +205,14 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
       const every = h("input", { type: "number", min: "5", step: "1", value: String(Math.round(t.every / 60)) }) as HTMLInputElement;
       const at = h("input", { type: "text", value: (t.at ?? []).join(", "), placeholder: "08:00, 18:00", autocapitalize: "off" }) as HTMLInputElement;
       const nextAt = h("input", { type: "datetime-local", value: toLocalInput(Math.max(t.next, Date.now() / 1000)) }) as HTMLInputElement;
-      // What it may do without asking (SPEC §7.4): the person changes it here, their own action, so no card.
-      const g: Grant = { open: [], type: [], search: false, email: [], drafts: false, calendar_add: false, calendar_change: false, ...t.grant };
-      const types = h("input", { type: "text", value: g.type.join(", "), placeholder: "fedex.com, royalmail.com", autocapitalize: "off" }) as HTMLInputElement;
-      const opens = h("input", { type: "text", value: g.open.join(", "), placeholder: "Sites", autocapitalize: "off" }) as HTMLInputElement;
-      const people = h("input", { type: "text", value: g.email.join(", "), placeholder: "Email addresses", autocapitalize: "off" }) as HTMLInputElement;
-      const tick = (on: boolean, words: string) => {
+      // Approved permissions (SPEC §5.3): what its cards were allowed "always"; untick to take one back. Only a
+      // card's tick adds one.
+      const keep = (t.allowed ?? []).map((a) => {
         const box = h("input", { type: "checkbox" }) as HTMLInputElement;
-        box.checked = on;
-        return [box, h("label", { class: "check" }, box, h("span", {}, words))] as const;
-      };
-      const [search, searchRow] = tick(g.search, "Search the web");
-      const [drafts, draftsRow] = tick(g.drafts, "Save email drafts in your mailbox (nothing is sent)");
-      const [adds, addsRow] = tick(g.calendar_add, "Add new events to your calendar");
-      const [changes, changesRow] = tick(g.calendar_change, "Change events already in your calendar");
-      const allowed = h(
-        "fieldset",
-        { class: "task-allowed" },
-        h("legend", {}, "Allowed without asking"),
-        field("Type and fill in forms on (sites)", types),
-        field("Open pages on, read only (sites)", opens),
-        field("Send email to", people),
-        searchRow,
-        draftsRow,
-        addsRow,
-        changesRow,
-      );
+        box.checked = true;
+        return { key: a.key, box, row: h("label", { class: "check" }, box, h("span", {}, a.label)) };
+      });
+      const allowed = keep.length ? h("fieldset", { class: "task-allowed" }, h("legend", {}, "Approved permissions"), ...keep.map((k) => k.row)) : null;
       const error = h("p", { class: "fine error", hidden: "" });
       const save = h("button", { class: "run", type: "button" }, "Save");
       const back = h("button", { class: "run quiet", type: "button" }, "Cancel");
@@ -256,7 +223,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
         field("How it checks", box),
         field("Done when (or never)", doneWhen),
         h("div", { class: "task-edit-row" }, field("Check every (minutes)", every), field("Or at times of day", at), field("Next check", nextAt)),
-        allowed,
+        ...(allowed ? [allowed] : []),
         error,
         h("div", { class: "task-edit-actions" }, back, save),
       );
@@ -285,16 +252,8 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
         error.hidden = !why;
         if (why) return;
         save.setAttribute("disabled", "");
-        const grant: Grant = {
-          open: listOf(opens.value),
-          type: listOf(types.value),
-          search: search.checked,
-          email: listOf(people.value),
-          drafts: drafts.checked,
-          calendar_add: adds.checked,
-          calendar_change: changes.checked,
-        };
-        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), done_when: doneWhen.value.trim(), at: at.value.trim(), every: Math.round(minutes) * 60, next, grant });
+        const kept = keep.filter((k) => k.box.checked).map((k) => k.key);
+        const sent = await client.send({ t: "task_edit", id: t.id, title: title.value.trim(), prompt: box.value.trim(), done_when: doneWhen.value.trim(), at: at.value.trim(), every: Math.round(minutes) * 60, next, allowed: kept });
         if (sent) done(); // the computer sends the new list
         else save.removeAttribute("disabled");
       };
@@ -315,7 +274,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
         h("dd", {}, t.at?.length ? `Every day at ${t.at.join(" and ")}` : everyWords(t.every)),
         h("dt", {}, "Next"),
         h("dd", {}, next),
-        ...(t.allowed?.length ? [h("dt", {}, "Allowed"), h("dd", {}, h("ul", { class: "allowed" }, ...t.allowed.map((a) => h("li", {}, a))))] : []),
+        ...(t.allowed?.length ? [h("dt", {}, "Approved"), h("dd", {}, h("ul", { class: "allowed" }, ...t.allowed.map((a) => h("li", {}, a.label))))] : []),
       ),
       lastCheck(t, checks),
       foot,

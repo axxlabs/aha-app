@@ -393,7 +393,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       const hidden: Record<string, string> = f.kind === "taps" ? { hidden: "" } : {}; // a check card's taps are made on the screenshot
       const cls = f.kind === "longtext" ? "long" : f.kind === "bool" ? "tick" : "";
       dl.append(h("dt", cls === "tick" ? { class: "tick", ...hidden } : hidden, f.label));
-      // A tick (a task's permission) reads as allowed; only Edit makes it a checkbox, to revoke it.
+      // A tick reads as ✓ or —; only Edit makes it a checkbox.
       const dd = h("dd", cls ? { class: cls, ...hidden } : hidden, cls === "tick" ? (f.value === "true" ? "✓" : "—") : f.value);
       dl.append(dd);
       inputs.push(null);
@@ -443,7 +443,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       };
       card.append(frame, h("p", { class: "fine" }, "Tap the picture where you'd click, then send your taps. When the check is done, tap “It's done”."), undo);
     } else if (shot) card.append(shot);
-    card.append(dl, actions, stateEl);
+    // "Always allow for this task" (SPEC §5.3): on every action card; ticked, the same action isn't asked again
+    // in this request, or in any of a background task's checks.
+    const always = it.always === true ? (h("input", { type: "checkbox" }) as HTMLInputElement) : null;
+    card.append(dl, ...(always ? [h("label", { class: "always" }, always, h("span", {}, "Always allow for this task"))] : []), actions, stateEl);
     let editing = false;
     // A sign-in card's inputs are open from the start: the person types into them (SPEC §5.3). A check card's
     // only input is the screenshot.
@@ -488,7 +491,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     };
     approve.onclick = async () => {
       const values = fields.map(valueOf);
-      const sent = await client.send({ t: "approval_reply", id, decision: "approve", ...(editing ? { values } : {}) });
+      const sent = await client.send({ t: "approval_reply", id, decision: "approve", ...(editing ? { values } : {}), ...(always?.checked ? { always: true } : {}) });
       fields.forEach((f, i) => {
         const inp = inputs[i];
         if (f.kind === "secret" && inp) inp.value = "";

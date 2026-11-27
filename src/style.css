@@ -56,6 +56,8 @@ a { color: inherit; text-underline-offset: 3px; }
 .fold:hover { background: var(--soft); }
 .fold .chevron { flex: none; width: 10px; font-size: 9px; line-height: 1; color: var(--muted); opacity: .8; }
 .fold + .fold, .day + .fold { margin-top: -12px; }
+.fold .num { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fold .num::before { content: "#"; }
 .fold .title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fold .marks { flex: none; display: flex; gap: 4px; align-items: center; }
 .fold time { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }

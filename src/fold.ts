@@ -14,6 +14,7 @@ export interface Part {
   last: number;
   ts: number; // when it started
   title: string;
+  n?: number; // its topic's number (SPEC §7.4 "Topic numbers"), when the computer gave one
   folded: boolean; // false for the part still going on
   open: Set<number>; // seqs that stay visible while it's folded
   notes: Note[]; // its background task notes, in order
@@ -68,6 +69,12 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
     const live =
       i === parts.length - 1 && !cutBetween(last, Infinity) && (working || !isBreak(part[part.length - 1].ts, now));
     const named = titles.filter((t) => Number(t.from) >= first && Number(t.from) <= last).pop();
+    // Its topic's number: the latest titled part starting at or before its end, with no cut between (a part split
+    // off by a break keeps its topic's number).
+    const covering = titles
+      .filter((t) => typeof t.n === "number" && Number(t.from) <= last && !cutBetween(Number(t.from), first))
+      .sort((a, b) => Number(a.from) - Number(b.from))
+      .pop();
     const open = new Set<number>();
     part.forEach((it, k) => {
       const unfinished =
@@ -90,7 +97,8 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
         const fields = Array.isArray(it.fields) ? (it.fields as { value?: unknown }[]) : [];
         return { id: String(it.id), ts: it.ts, title: String(fields[0]?.value ?? "") }; // "Waiting for"
       });
-    return { first, last, ts: part[0].ts, title: String(named?.text ?? "") || firstWords(part), folded: !live, open, notes, started };
+    const n = typeof covering?.n === "number" ? covering.n : undefined;
+    return { first, last, ts: part[0].ts, title: String(named?.text ?? "") || firstWords(part), n, folded: !live, open, notes, started };
   });
 }
 

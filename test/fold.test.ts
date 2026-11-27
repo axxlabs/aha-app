@@ -29,6 +29,17 @@ describe("folding after a break (SPEC §7.4)", () => {
     expect(plan([...a, ...b], new Set(), T + 6 * 60 * min, true)[1].folded).toBe(false); // still working on it
   });
 
+  it("numbers each topic's lines, a break keeping the number and a cut ending it (SPEC §7.4 \"Topic numbers\")", () => {
+    n = 0;
+    const a = [me(T, "book Flat Iron"), aha(T + min)];
+    const title = { seq: ++n, ts: T + 2 * min, t: "title", from: a[0].seq, text: "Flat Iron", n: 12 } as Item;
+    const b = [me(T + 3 * 60 * min, "and the time?"), aha(T + 3 * 60 * min + min)]; // after a break, same topic
+    const cut = { seq: ++n, ts: T + 3 * 60 * min + 2 * min, t: "cut" } as Item;
+    const c = [me(T + 3 * 60 * min + 3 * min, "weather?"), aha(T + 3 * 60 * min + 4 * min)];
+    const parts = plan([...a, title, ...b, cut, ...c], new Set(), T + 9 * 60 * min);
+    expect(parts.map((p) => p.n)).toEqual([12, 12, undefined]);
+  });
+
   it("a new day is a break", () => {
     n = 0;
     const night = new Date(2026, 10, 24, 23, 50).getTime() / 1000;

@@ -123,13 +123,16 @@ export function chatView(d: ViewDeps) {
         const title = document.createElement("span");
         title.className = "title";
         title.textContent = p.title;
+        const num = document.createElement("span"); // its number, to ask Aha! about it ("topic 12")
+        num.className = "num";
+        num.textContent = p.n ? String(p.n) : "";
         const marks = document.createElement("span");
         marks.className = "marks";
         marks.append(...(d.marks?.(p, states) ?? []));
         const time = document.createElement("time");
         time.textContent = foldTime(p);
-        line.replaceChildren(chevron, title, marks, time);
-        line.setAttribute("aria-label", `${p.title} · ${day} ${time.textContent}`);
+        line.replaceChildren(chevron, ...(p.n ? [num] : []), title, marks, time);
+        line.setAttribute("aria-label", `${p.n ? `Topic ${p.n}: ` : ""}${p.title} · ${day} ${time.textContent}`);
         line.setAttribute("aria-expanded", String(open));
         want.push(line);
       }

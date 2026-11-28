@@ -121,13 +121,3 @@ export function dayWords(ts: number, now: number, format: DateFormat = "short"):
   const date = formatDate(d, format, n);
   return days > 1 && days < 7 ? `Last week · ${date}` : date;
 }
-
-/** A result's gist: its first words as plain text, at most `max` characters. */
-export function gist(text: string, max = 140): string {
-  const plain = text
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // links: their words
-    .replace(/[*_`#>]+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return plain.length > max ? `${plain.slice(0, max - 1).replace(/\s+\S*$/, "")}…` : plain;
-}

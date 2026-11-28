@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 import { describe, expect, it } from "vitest";
-import { dayWords, gist, groups, topicsOf } from "../src/fold";
+import { dayWords, groups, topicsOf } from "../src/fold";
 import type { Item } from "../src/store";
 
 const T = new Date(2026, 10, 24, 9, 0).getTime() / 1000; // 24 Nov, 09:00 local
@@ -59,11 +59,6 @@ describe("topics (SPEC §4.1)", () => {
       ["Yesterday", 2],
       ["Today", 1],
     ]);
-  });
-
-  it("gives a result's gist: plain words, cut at a word", () => {
-    expect(gist("**Sam replied**: see [the email](https://x.y/z).\n\n# More")).toBe("Sam replied: see the email. More");
-    expect(gist("one two three four", 12)).toBe("one two…");
   });
 });
 

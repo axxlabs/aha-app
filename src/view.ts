@@ -18,6 +18,7 @@ export interface ViewDeps {
   dayLabel(ts: number): string;
   busy(): boolean; // a request or wakeup is running
   busyTopic(): number; // the topic it works in (0: not known)
+  waking?(): number; // a topic that woke up on its own and works now (0: none): its line shows it, nothing else
   strip?(n: number, s: Schedule): HTMLElement; // a scheduled topic's strip (SPEC §4.1)
   background?: HTMLElement; // "Continue in background": shown in the open topic while sha works on it
   remove?(n: number): void; // the open topic's Delete topic (SPEC §4.1)
@@ -89,7 +90,7 @@ export function chatView(d: ViewDeps) {
       el.setAttribute("aria-label", label);
       return el;
     };
-    if (d.busy() && d.busyTopic() === t.n) return span("running", "•••", "sha is working on it");
+    if ((d.busy() && d.busyTopic() === t.n) || d.waking?.() === t.n) return span("running", "•••", "sha is working on it");
     if (t.needsInput) return span("waiting", "●", "Waiting on you");
     if (t.state === "scheduled" && t.schedule) {
       return span("scheduled", t.schedule.paused ? "⏱" : `⏱ ${lineTime(t.schedule.next)}`, "Checks on its own");

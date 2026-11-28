@@ -260,6 +260,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const cards = new Map<string, { el: HTMLElement; resolved: boolean }>();
   let busy = false;
   let busyTopic = 0; // the topic sha works in (SPEC §4.1)
+  let wakingTopic = 0; // a topic that woke up on its own and works now: only its line shows it
   let historyStart = 1; // the first message the computer still holds (SPEC §3.8.1)
   // The chat view (src/view.ts): the items are its only state, and it draws everything from them.
   const view = chatView({
@@ -273,6 +274,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     dayLabel,
     busy: () => busy,
     busyTopic: () => busyTopic,
+    waking: () => wakingTopic,
     strip: (n, sched) => scheduleStrip(client, n, sched, () => client.settings.dates ?? "short"),
     background: backgroundBtn,
     remove(n) {
@@ -549,7 +551,13 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       // which turned it off at every message a task sends while it carries on (SPEC §3.3).
       if (live) view.invalidate(true);
     },
-    typing(on, queued, topic) {
+    typing(on, queued, topic, wake) {
+      if (wake) {
+        // A wakeup (SPEC §4.1): moving dots on its topic's line; no "working…", no Stop.
+        wakingTopic = on ? topic || wakingTopic : 0;
+        view.invalidate();
+        return;
+      }
       // The model answers one request at a time for the household (SPEC §3.3): say when it's someone else's turn.
       workingText.textContent = queued ? " sha is finishing someone else's request first…" : " sha is working…";
       busyTopic = on ? topic || busyTopic : 0;

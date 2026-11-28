@@ -283,7 +283,7 @@ export function browserSites(raw: unknown): BrowserSite[] {
 
 export interface Events {
   item(it: Item, live: boolean): void;
-  typing(on: boolean, queued?: boolean, topic?: number): void; // queued: waiting while someone else's request runs; topic: where
+  typing(on: boolean, queued?: boolean, topic?: number, wake?: boolean): void; // queued: waiting while someone else's request runs; topic: where; wake: a topic woke up on its own
   status(s: { connected: boolean; computer: boolean }): void;
   history(items: Item[]): void;
   historyStart(start: number): void; // items before `start` were deleted on the computer
@@ -441,7 +441,7 @@ export class Client {
     }
     switch (msg.t) {
       case "typing":
-        this.on.typing(!!msg.on, msg.queued === true, typeof msg.topic === "number" ? msg.topic : 0);
+        this.on.typing(!!msg.on, msg.queued === true, typeof msg.topic === "number" ? msg.topic : 0, msg.wake === true);
         break;
       case "sync":
         if (typeof msg.start === "number") await this.dropBefore(msg.start);

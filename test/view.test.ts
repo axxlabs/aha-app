@@ -10,7 +10,7 @@ let n = 0;
 const me = (topic: number, ts: number, text: string, extra: Record<string, unknown> = {}) => ({ seq: ++n, ts, t: "msg", role: "me", text, topic, ...extra }) as Item;
 const aha = (topic: number, ts: number, text: string) => ({ seq: ++n, ts, t: "msg", role: "aha", text, topic }) as Item;
 
-function setup(now = T + 600, busyTopic = 0) {
+function setup(now = T + 600, busyTopic = 0, waking = 0) {
   n = 0;
   const col = document.createElement("div");
   const scroller = document.createElement("main");
@@ -40,6 +40,7 @@ function setup(now = T + 600, busyTopic = 0) {
     dayLabel: (ts) => new Date(ts * 1000).toDateString(),
     busy: () => busyTopic > 0,
     busyTopic: () => busyTopic,
+    waking: () => waking,
     opened: (x) => opened.push(x),
     now: () => now,
     frame: (fn) => fn(), // draw at once
@@ -132,6 +133,15 @@ describe("the chat view (SPEC §4.1, §7.4)", () => {
     view.add([{ seq: ++n, ts: T + 5, t: "topic", topic: 2, title: "", state: "deleted" } as Item]);
     expect(shown()).toEqual(["▾keep", "keep", "[composer]"]);
     expect(view.opened()).toBe(1);
+  });
+
+  it("a topic that woke up on its own shows moving dots on its line, and nothing else changes", () => {
+    const { view, col, footer } = setup(T + 4 * 3600, 0, 1);
+    view.add([me(1, T, "parcel"), me(2, T + 60, "weather")]);
+    const line = [...col.querySelectorAll(".fold")].find((l) => l.querySelector(".title")?.textContent === "parcel");
+    expect(line?.querySelector(".state-icon.running")).not.toBeNull();
+    expect(col.querySelector(".working")).toBeNull();
+    expect(footer.hidden).toBe(false);
   });
 
   it("drops what's before the history's start", () => {

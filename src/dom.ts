@@ -41,7 +41,7 @@ export const ICONS = {
   photo: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
 };
 
-// A photo for Aha! (SPEC §7.4): at most 1600 px on its longest side, re-encoded as JPEG, which also drops its
+// A photo for SHA (SPEC §7.4): at most 1600 px on its longest side, re-encoded as JPEG, which also drops its
 
 const PANE_MEDIA = "(min-width: 1400px)"; // 30% of it is at least the sheet's 420px; keep in step with style.css
 

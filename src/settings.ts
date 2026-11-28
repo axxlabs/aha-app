@@ -49,7 +49,7 @@ function reportView(client: Client, back: () => void) {
     h("p", { class: "fine" }, "Send Axxlabs the latest messages so we can see what went wrong. You'll see exactly what's sent before anything leaves your computer."),
     note,
     h("div", { class: "row" }, h("span", {}, "Include"), count),
-    h("label", { class: "row", for: "report-details" }, h("span", {}, "Include technical details", h("small", {}, "The searches, pages and tools Aha! used for these messages. Helps us find the problem.")), details),
+    h("label", { class: "row", for: "report-details" }, h("span", {}, "Include technical details", h("small", {}, "The searches, pages and tools SHA used for these messages. Helps us find the problem.")), details),
     draft,
     h("p", { class: "fine", hidden: "" }, "Only the text above is sent. It goes to Axxlabs as a private report, without your name or account, and is deleted once we've dealt with it (at most 90 days)."),
     status,
@@ -99,7 +99,7 @@ function reportView(client: Client, back: () => void) {
 export function openSettings(store: Store, client: Client, onClose: () => void): SettingsUi {
   const close = h("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon(ICONS.close));
   const devices = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
-  // Your browser (SPEC §3.4, §7.4): what Aha!'s browser on the computer remembers for this person.
+  // Your browser (SPEC §3.4, §7.4): what SHA's browser on the computer remembers for this person.
   const sites = h("div", {}, h("p", { class: "fine" }, client.computer ? "Loading…" : "Your computer is offline."));
   const clearBrowser = h("button", { class: "btn danger", type: "button", disabled: "" }, "Clear browser");
   const trustInput = h("input", { type: "text", placeholder: "e.g. waitrose.com", "aria-label": "A site to trust", autocapitalize: "off", spellcheck: "false" }) as HTMLInputElement;
@@ -159,7 +159,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
     linkModes.append(b);
   }
   const unpair = h("button", { class: "btn danger", type: "button" }, "Unpair");
-  // Settings → Connections (SPEC §7.4): what Aha! is connected to for this person; the address only.
+  // Settings → Connections (SPEC §7.4): what SHA is connected to for this person; the address only.
   // Settings → Connections (SPEC §7.4): one row per connected account, each with its own Disconnect.
   const connections = h("div", {}, h("p", { class: "fine" }, "Checking…"));
   const reportBtn = h("button", { class: "btn", type: "button" }, "Report");
@@ -203,7 +203,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
         "section",
         {},
         h("h4", {}, "Your browser"),
-        h("p", { class: "fine" }, "Aha!'s browser remembers sites like your own browser does, so you stay signed in. On trusted sites it acts without asking you first. Logins you chose to save are kept encrypted on your computer."),
+        h("p", { class: "fine" }, "SHA's browser remembers sites like your own browser does, so you stay signed in. On trusted sites it acts without asking you first. Logins you chose to save are kept encrypted on your computer."),
         sites,
         h("div", { class: "row" }, h("span", {}, "Trust a site", h("small", {}, "Acts there without asking.")), h("span", { class: "site-actions" }, trustInput, trustBtn)),
         siteNote,
@@ -219,7 +219,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
         "section",
         {},
         h("h4", {}, "Model"),
-        h("div", { class: "row" }, h("span", {}, "Aha!'s model", modelAbout), model),
+        h("div", { class: "row" }, h("span", {}, "SHA's model", modelAbout), model),
         h("p", { class: "fine" }, "For everyone in your household. The first reply after a change takes a little longer while it loads."),
         modelNote,
       ),
@@ -228,13 +228,13 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
         {},
         h("h4", {}, "Clear"),
         h("div", { class: "row" }, h("span", {}, "Chat history", h("small", {}, "From your computer and all your devices. Memories, tasks and sign-ins stay.")), clearHistory),
-        h("div", { class: "row" }, h("span", {}, "Browser data", h("small", {}, "Everything Aha!'s browser remembers: every site is forgotten, with its sign-in, saved login and trust.")), clearBrowser),
+        h("div", { class: "row" }, h("span", {}, "Browser data", h("small", {}, "Everything SHA's browser remembers: every site is forgotten, with its sign-in, saved login and trust.")), clearBrowser),
       ),
       h(
         "section",
         {},
         h("h4", {}, "This device"),
-        h("div", { class: "row" }, h("span", {}, "Notifications", h("small", {}, "They only say “New message from Aha!”.")), notify),
+        h("div", { class: "row" }, h("span", {}, "Notifications", h("small", {}, "They only say “New message from SHA”.")), notify),
         h("div", { class: "row col-row" }, h("span", {}, "Open links", h("small", {}, "In the installed app on a phone: over the app, or in your phone's browser.")), linkModes),
         h("div", { class: "row col-row" }, h("span", {}, "Dates", h("small", {}, "How dates in replies read, on this device.")), dateModes),
         h("div", { class: "row" }, h("span", {}, "Unpair this device", h("small", {}, "Deletes its keys and cached messages.")), unpair),
@@ -253,7 +253,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
           h("code", { class: "fp" }, client.identity.fp ? shortFingerprint(client.identity.fp) : "—"),
         ),
       ),
-      h("p", { class: "fine" }, `Aha! ${APP_VERSION} (${BUILD}) · end-to-end encrypted (AHA-PQ v1) · `, h("a", { href: "https://github.com/axxlabs/aha-app", target: "_blank", rel: "noopener noreferrer" }, "source (AGPL-3.0)")),
+      h("p", { class: "fine" }, `SHA ${APP_VERSION} (${BUILD}) · end-to-end encrypted (AHA-PQ v1) · `, h("a", { href: "https://github.com/axxlabs/aha-app", target: "_blank", rel: "noopener noreferrer" }, "source (AGPL-3.0)")),
     );
   const { dialog, shut } = openSheet("Settings", content, onClose);
   close.onclick = shut;
@@ -315,7 +315,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
     if (e.key === "Enter") trustBtn.click();
   });
   clearBrowser.onclick = async () => {
-    if (!confirm("Clear everything Aha!'s browser remembers? Every site is forgotten: you'll be signed out everywhere, saved logins are deleted and no site stays trusted.")) return;
+    if (!confirm("Clear everything SHA's browser remembers? Every site is forgotten: you'll be signed out everywhere, saved logins are deleted and no site stays trusted.")) return;
     clearBrowser.disabled = true;
     if (!(await client.send({ t: "browser_clear" }))) {
       clearBrowser.disabled = false;
@@ -350,7 +350,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
     inner.append(report.el);
   };
   unpair.onclick = async () => {
-    if (!confirm("Unpair this device? It won't be able to reach Aha! any more, and its keys and cached messages will be deleted. Pair it again with a new QR code.")) return;
+    if (!confirm("Unpair this device? It won't be able to reach SHA any more, and its keys and cached messages will be deleted. Pair it again with a new QR code.")) return;
     await client.send({ t: "revoke_device", device: client.dev });
     client.stop();
     await store.wipe();
@@ -393,7 +393,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
       const rows = emails.map((email) => {
         const btn = h("button", { class: "btn danger", type: "button" }, "Disconnect");
         btn.onclick = async () => {
-          if (!confirm(`Disconnect ${email}? Aha! won't be able to use its email or calendar until it's connected again.`)) return;
+          if (!confirm(`Disconnect ${email}? SHA won't be able to use its email or calendar until it's connected again.`)) return;
           btn.setAttribute("disabled", "");
           if (!(await client.send({ t: "email_disconnect", email }))) {
             btn.removeAttribute("disabled");
@@ -434,7 +434,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
                   login.disabled = false;
                 }
               };
-              // Trusted (SPEC §5.7): Aha! acts on this site without asking.
+              // Trusted (SPEC §5.7): SHA acts on this site without asking.
               const trust = h("input", { type: "checkbox", "aria-label": `Trust ${s.site}` }) as HTMLInputElement;
               trust.checked = s.trusted;
               trust.onchange = async () => {
@@ -464,7 +464,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
           b.onclick = d.this
             ? () => unpair.click()
             : async () => {
-                if (confirm(`Revoke “${d.name}”? It won't be able to reach Aha! any more.`)) await client.send({ t: "revoke_device", device: d.id });
+                if (confirm(`Revoke “${d.name}”? It won't be able to reach SHA any more.`)) await client.send({ t: "revoke_device", device: d.id });
               };
           row.append(b);
           return row;

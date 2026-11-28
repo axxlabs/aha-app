@@ -86,10 +86,10 @@ a { color: inherit; text-underline-offset: 3px; }
 .me.pending { opacity: .6; }
 .me .note { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
 .aha { overflow-wrap: anywhere; }
-/* The receipt (SPEC §7.4): Aha!'s own record of what a request changed, not the model's words. Not a reply: small,
+/* The receipt (SPEC §7.4): SHA's own record of what a request changed, not the model's words. Not a reply: small,
    in the interface's own type, a dashed rule and a tick, so it never reads as text the model wrote. */
 .aha-turn { display: flex; flex-direction: column; gap: 8px; }
-/* What Aha! did (SPEC §7.4): one line per thing a request did, in the chat where it happened. The computer's
+/* What SHA did (SPEC §7.4): one line per thing a request did, in the chat where it happened. The computer's
    record, not the model's words: the receipt's dashed edge, small, muted, a tick. */
 .act { align-self: flex-start; max-width: 100%; margin: 0; padding: 3px 10px; border: 1px dashed var(--line);
   border-radius: 8px; font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--muted);
@@ -279,7 +279,7 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .site-actions input[type="text"] { width: 11em; border: 1px solid var(--line); background: var(--card); color: inherit; border-radius: 10px; padding: 6px 10px; }
 .trust { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
 .trust input { width: 18px; height: 18px; accent-color: var(--accent, currentColor); }
-/* ⋯ under Aha!'s messages, and a message's details (SPEC §3.8) */
+/* ⋯ under SHA's messages, and a message's details (SPEC §3.8) */
 .trace { display: flex; flex-direction: column; gap: 12px; }
 .trace-row { display: flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--line); padding-left: 10px; }
 .trace-head { display: flex; gap: 8px; align-items: baseline; }
@@ -386,7 +386,7 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .task-note header span { color: var(--muted); font-weight: 600; overflow-wrap: anywhere; }
 .task-note .aha > :first-child { margin-top: 0; }
 .task-note .aha > :last-child { margin-bottom: 0; }
-/* A tool Aha! used (SPEC §7.4 "Tools used"): small side info between the messages, not a reply. */
+/* A tool SHA used (SPEC §7.4 "Tools used"): small side info between the messages, not a reply. */
 /* A request's Details line (SPEC §7.4 "Details"): small, under the request, closed until opened; live while it works */
 .steps { margin: -2px 0 2px; font-size: 12px; color: var(--muted); }
 .steps-toggle { border: 0; background: none; color: inherit; font: inherit; padding: 2px 6px 2px 2px; border-radius: 8px; display: inline-flex; gap: 6px; align-items: baseline; text-align: left; cursor: pointer; }

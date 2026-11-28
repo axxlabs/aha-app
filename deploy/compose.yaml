@@ -1,4 +1,4 @@
-# The Aha! app's server (SPEC §7.4): Caddy serving the current release that deploy/update.sh built.
+# The SHA app's server (SPEC §7.4): Caddy serving the current release that deploy/update.sh built.
 services:
   caddy:
     image: docker.io/library/caddy@sha256:4851e54a46b206517c574821bb5cc67f170d2156041e9fbc4c9193b45e84a75b  # caddy:2, pinned (SPEC §9.2)

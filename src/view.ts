@@ -9,7 +9,7 @@ import type { Item } from "./store";
 export interface ViewDeps {
   col: HTMLElement; // where the chat goes
   scroller: HTMLElement; // what scrolls
-  working: HTMLElement; // "Aha! is working…", always last
+  working: HTMLElement; // "SHA is working…", always last
   node(it: Item): HTMLElement | null; // an item's element (null: not shown)
   resolve(it: Item, state: string): void; // show a card's answer on its element
   dayLabel(ts: number): string;
@@ -123,7 +123,7 @@ export function chatView(d: ViewDeps) {
         const title = document.createElement("span");
         title.className = "title";
         title.textContent = p.title;
-        const num = document.createElement("span"); // its number, to ask Aha! about it ("topic 12")
+        const num = document.createElement("span"); // its number, to ask SHA about it ("topic 12")
         num.className = "num";
         num.textContent = p.n ? String(p.n) : "";
         const marks = document.createElement("span");

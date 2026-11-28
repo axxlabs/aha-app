@@ -74,7 +74,7 @@ md.core.ruler.push("email_labels", (state) => {
   }
 });
 
-// Date labels (SPEC §7.4 "Labels"): Aha! writes every date as a full date, DD/MM/YYYY, never a weekday (it guesses
+// Date labels (SPEC §7.4 "Labels"): SHA writes every date as a full date, DD/MM/YYYY, never a weekday (it guesses
 // weekdays wrong). Each one shows here as a label, its weekday worked out by the app, in the person's format.
 export type DateFormat = "short" | "day" | "long" | "plain" | "numeric";
 export const DATE_FORMATS: [DateFormat, string][] = [

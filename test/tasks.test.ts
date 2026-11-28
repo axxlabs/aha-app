@@ -17,7 +17,7 @@ describe("tasks panel", () => {
     const when = () => "14:35";
     expect(nextWords({ next: 2000 }, 1000, when)).toBe("Next check 14:35");
     expect(nextWords({ next: 900 }, 1000, when)).toBe("At the next idle time");
-    expect(nextWords({ next: 2000, now: true }, 1000, when)).toBe("As soon as Aha! is free · then 14:35");
+    expect(nextWords({ next: 2000, now: true }, 1000, when)).toBe("As soon as SHA is free · then 14:35");
     expect(nextWords({ next: 2000, running: true }, 1000, when)).toBe("Checking now · then 14:35");
     expect(nextWords({ next: 900, running: true }, 1000, when)).toBe("Checking now");
   });
@@ -43,7 +43,7 @@ describe("tasks panel", () => {
     expect(countWords(3, 1)).toBe("3 checks, 1 update sent");
   });
 
-  it("says how long Aha! has been idle, or that it's working", () => {
+  it("says how long SHA has been idle, or that it's working", () => {
     expect(idleWords(30)).toBe("less than a minute");
     expect(idleWords(12 * 60 + 5)).toBe("12 min");
     expect(idleWords(125 * 60)).toBe("2 h 5 min");

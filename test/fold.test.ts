@@ -62,7 +62,7 @@ describe("folding after a break (SPEC §7.4)", () => {
     const reply = me(T + 3 * min, "8pm");
     [p] = plan([ask, card, q, waits, reply], new Set(["a1"]), later); // the question was answered
     expect(p.open.size).toBe(0);
-    const stopped = aha(T + 4 * min, "Aha! is restarting…", "stopped");
+    const stopped = aha(T + 4 * min, "SHA is restarting…", "stopped");
     [p] = plan([ask, card, q, waits, reply, stopped], new Set(["a1"]), later);
     expect([...p.open].sort()).toEqual([reply.seq, stopped.seq].sort()); // with what it was doing
   });

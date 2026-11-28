@@ -101,7 +101,7 @@ export function detailsLines(client: Client) {
       if (was && was !== task) lines.get(was)?.idle();
       lines.get(task)?.add(e);
     },
-    /** Aha! stopped working: no line is live any more. */
+    /** SHA stopped working: no line is live any more. */
     idle(): void {
       const was = working;
       working = "";

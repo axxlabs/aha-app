@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
-// Memory (SPEC §5.4, §7.4): what Aha! keeps between conversations, in a panel of its own. The facts the person
-// approved about themselves, and Aha!'s memory of each topic, newest first, each with Forget.
+// Memory (SPEC §5.4, §7.4): what SHA keeps between conversations, in a panel of its own. The facts the person
+// approved about themselves, and SHA's memory of each topic, newest first, each with Forget.
 import type { Client } from "./client";
 import { ICONS, h, icon, openSheet } from "./dom";
 import { formatDate } from "./markdown";
@@ -32,7 +32,7 @@ export function openMemory(client: Client, onClose: () => void): MemoryUi {
     "div",
     { class: "sheet-in memory" },
     h("header", {}, h("h2", {}, "Memory"), close),
-    h("p", { class: "fine" }, "What Aha! keeps between conversations, on your computer. To change something, tell Aha! in the chat."),
+    h("p", { class: "fine" }, "What SHA keeps between conversations, on your computer. To change something, tell SHA in the chat."),
     h("section", {}, h("h4", {}, "About you"), facts),
     h("section", {}, h("div", { class: "topics-head" }, h("h4", {}, "Topics ", count), search), topics),
   );
@@ -63,12 +63,12 @@ export function openMemory(client: Client, onClose: () => void): MemoryUi {
                 "header",
                 {},
                 h("div", {}, h("b", {}, t.title || "Untitled"), h("time", {}, t.ts ? formatDate(new Date(t.ts * 1000), client.settings.dates) : "Earlier")),
-                forgetButton(t.id, `what Aha! remembers of “${t.title || "this topic"}”`),
+                forgetButton(t.id, `what SHA remembers of “${t.title || "this topic"}”`),
               ),
               h("p", {}, t.text),
             ),
           )
-        : [h("p", { class: "fine" }, q ? "No topic matches." : "Nothing yet. After each conversation, Aha! notes what matters here.")]),
+        : [h("p", { class: "fine" }, q ? "No topic matches." : "Nothing yet. After each conversation, SHA notes what matters here.")]),
     );
   };
   search.oninput = draw;
@@ -80,7 +80,7 @@ export function openMemory(client: Client, onClose: () => void): MemoryUi {
       facts.replaceChildren(
         ...(list.length
           ? list.map((m) => h("div", { class: "fact" }, h("span", {}, m.text), forgetButton(m.id, `“${m.text}”`)))
-          : [h("p", { class: "fine" }, "Nothing yet. Aha! asks before it saves something about you.")]),
+          : [h("p", { class: "fine" }, "Nothing yet. SHA asks before it saves something about you.")]),
       );
       shown = entries;
       count.textContent = entries.length ? String(entries.length) : "";

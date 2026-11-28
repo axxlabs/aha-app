@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
-// Tasks (SPEC §3.4 "Background tasks", §7.4): what Aha! waits for and checks on its own, in a panel of its own.
+// Tasks (SPEC §3.4 "Background tasks", §7.4): what SHA waits for and checks on its own, in a panel of its own.
 // Each task with how often it checks, the next check and what ends it, what the last check found, and Cancel; at
-// the top, the idle time the checks wait for (they run only while nobody uses Aha!).
+// the top, the idle time the checks wait for (they run only while nobody uses SHA).
 import type { Client } from "./client";
 import { ICONS, h, icon, openSheet } from "./dom";
 import { gist } from "./fold";
@@ -99,7 +99,7 @@ export function nextWords(t: Pick<BackgroundTask, "next" | "now" | "running">, n
   // Run now is an extra check: the planned one keeps its time, said beside it.
   const then = t.next <= now ? "" : ` · then ${when(t.next)}`;
   if (t.running) return `Checking now${then}`;
-  if (t.now) return `As soon as Aha! is free${then}`;
+  if (t.now) return `As soon as SHA is free${then}`;
   return planned;
 }
 
@@ -145,7 +145,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
     "div",
     { class: "sheet-in tasks" },
     h("header", {}, h("h2", {}, "Tasks"), close),
-    h("p", { class: "fine" }, "What Aha! does later on its own: waiting for something, or at a time. It checks while nobody is using it, and tells you in the chat. To start one, ask in the chat."),
+    h("p", { class: "fine" }, "What SHA does later on its own: waiting for something, or at a time. It checks while nobody is using it, and tells you in the chat. To start one, ask in the chat."),
     idle,
     list,
   );
@@ -312,7 +312,7 @@ export function openTasks(client: Client, onClose: () => void, chat?: ChatLink):
     list.replaceChildren(
       ...(state.items.length
         ? state.items.map(card)
-        : [h("p", { class: "fine" }, "Nothing yet. Ask Aha! to remind you of something, do something at a time, or keep checking on something (a reply, a delivery, a price).")]),
+        : [h("p", { class: "fine" }, "Nothing yet. Ask SHA to remind you of something, do something at a time, or keep checking on something (a reply, a delivery, a price).")]),
     );
   }
 }

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Axxlabs Limited
 //
 // Service worker (SPEC §6.6, §7.4): lets the app open offline, and shows notifications. A notification's text
-// is fixed ("New message from Aha!") unless the push carries a preview that decrypts and verifies under this
+// is fixed ("New message from SHA") unless the push carries a preview that decrypts and verifies under this
 // device's push key, so a forged push can't put words on the screen. It never shows anything else.
 
 /// <reference lib="webworker" />
@@ -12,7 +12,7 @@ import { Store } from "./store";
 
 declare const self: ServiceWorkerGlobalScope;
 const CACHE = "aha-shell-v1";
-const FIXED = "New message from Aha!";
+const FIXED = "New message from SHA";
 
 self.addEventListener("install", () => void self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
@@ -57,7 +57,7 @@ self.addEventListener("push", (e) => {
         data = null;
       }
       const preview = data ? await previewFrom(data) : null;
-      await self.registration.showNotification("Aha!", { body: preview ?? FIXED, icon: "/icon-192.png", tag: "aha", renotify: true } as NotificationOptions);
+      await self.registration.showNotification("SHA", { body: preview ?? FIXED, icon: "/sha-192.png", tag: "aha", renotify: true } as NotificationOptions);
     })(),
   );
 });

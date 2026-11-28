@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Axxlabs Limited
 // The receipt under an answer (SPEC §7.4 "Receipt"): what the request changed, one line per action, as the
 // computer recorded it from the tool calls (a message typed on a site, a fact saved, a task started or
-// cancelled). It's Aha!'s own record, not the model's words: it's drawn apart from them, never as a reply, so an
+// cancelled). It's SHA's own record, not the model's words: it's drawn apart from them, never as a reply, so an
 // action the model doesn't mention still shows.
 import { ICONS, h, icon } from "./dom";
 
@@ -21,8 +21,8 @@ export function receiptLines(raw: unknown): string[] {
 export function receipt(lines: string[]): HTMLElement {
   return h(
     "aside",
-    { class: "receipt", "aria-label": "What Aha! did" },
-    h("header", {}, icon(ICONS.check), "What Aha! did"),
+    { class: "receipt", "aria-label": "What SHA did" },
+    h("header", {}, icon(ICONS.check), "What SHA did"),
     h("ul", {}, ...lines.map((l) => h("li", {}, l))),
   );
 }

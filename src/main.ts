@@ -17,7 +17,6 @@ import { type MemoryUi, openMemory } from "./memory";
 import { dayWords } from "./fold";
 import { scheduleStrip } from "./topics";
 import { render } from "./markdown";
-import { receipt, receiptLines } from "./receipt";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
 
@@ -327,16 +326,14 @@ async function chat(store: Store, identity: Identity): Promise<void> {
         const tail = details ? [details.line(it.seq, run)] : [];
         return h("div", { class: "aha-turn" }, ...(text.trim() || img ? [el] : []), ...tail);
       }
-      // A wakeup's message, or an answer from before boxes: the receipt, drawn apart from the model's words.
-      const done = receiptLines(it.record);
-      const rec = done.length ? receipt(done) : null;
-      return rec && !text.trim() && !img ? rec : rec ? h("div", { class: "aha-turn" }, el, rec) : el;
+      // What a request did shows as its ✓ lines, where it happened (SPEC §7.4 "Action lines").
+      return text.trim() || img ? el : null;
     }
     if (it.t === "approval") return approvalCard(it);
     // A request's Details line (SPEC §7.4 "Details"): what the model is doing, live, closed until opened.
     // Where a request's work starts: nothing shows there (SPEC §7.4).
     if (it.t === "steps") return null;
-    // One thing a request did, where it happened (SPEC §7.4 "What sha did"): the computer's line, not the model's.
+    // One thing a request did, where it happened (SPEC §7.4 "Action lines"): the computer's line, not the model's.
     if (it.t === "act" && typeof it.text === "string") return h("div", { class: "act", role: "note", "aria-label": "sha did" }, h("span", { class: "tick", "aria-hidden": "true" }, "✓"), it.text);
     // A tool line from before Details lines: side info, not part of a reply.
     return null;

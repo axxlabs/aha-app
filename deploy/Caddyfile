@@ -1,4 +1,4 @@
-# The SHA app's own origin (SPEC §7.4): static files only, with real security headers. No access log.
+# The sha app's own origin (SPEC §7.4): static files only, with real security headers. No access log.
 {$AHA_SITES} {
 	root * /srv/current
 	encode zstd gzip

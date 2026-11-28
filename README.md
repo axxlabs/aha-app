@@ -1,6 +1,6 @@
 # aha-app
 
-The **SHA** app: one private conversation with **SHA, a self-hosted assistant**, which runs on your own computer
+The **sha** app: one private conversation with **sha, a self-hosted assistant**, which runs on your own computer
 ([aha-local-llm](https://github.com/axxlabs/aha-local-llm)). It's an installable web app (add it to your home
 screen); store versions come later.
 
@@ -18,7 +18,7 @@ are at <https://app.aha.axxlabs.ai/release.txt>, so you can check the live app a
   recent messages, encrypted at rest (30 days by default, down to none, in Settings).
 - **It asks before it acts.** Forms and memories come as cards: Approve, Edit (in the card), Decline.
 - **No third parties.** No analytics, fonts or scripts from anywhere else; a strict Content-Security-Policy.
-  Notifications only ever say "New message from SHA" unless your computer is set to send verified previews.
+  Notifications only ever say "New message from sha" unless your computer is set to send verified previews.
 
 ## Develop
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 //
-// The SHA app (SPEC §7.4): one GPT-style conversation with your own computer, end-to-end encrypted.
+// The sha app (SPEC §7.4): one GPT-style conversation with your own computer, end-to-end encrypted.
 
 import "./style.css";
 import { applyTheme } from "./themes";
@@ -23,7 +23,7 @@ import { type Item, type Photo, Store } from "./store";
 
 const app = document.getElementById("app") as HTMLElement;
 
-// A photo for SHA (SPEC §7.4): at most 1600 px on its longest side, re-encoded as JPEG, which also drops its
+// A photo for sha (SPEC §7.4): at most 1600 px on its longest side, re-encoded as JPEG, which also drops its
 // location and other metadata; smaller again if it's still over ~900 kB.
 async function shrinkPhoto(file: File): Promise<Photo> {
   const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
@@ -41,7 +41,7 @@ async function shrinkPhoto(file: File): Promise<Photo> {
 }
 
 function mark(): HTMLElement {
-  return h("div", { class: "mark", "aria-label": "SHA" }, h("span", {}, "ah"), h("span", { class: "a" }, "a"));
+  return h("div", { class: "mark", "aria-label": "sha" }, h("span", {}, "sh"), h("span", { class: "a" }, "a"));
 }
 
 function screen(...children: (Node | string)[]): HTMLElement {
@@ -53,7 +53,7 @@ function screen(...children: (Node | string)[]): HTMLElement {
 
 async function boot(): Promise<void> {
   if (!window.isSecureContext || !crypto.subtle) {
-    screen(mark(), h("h1", {}, "Secure connection needed"), h("p", {}, "Open SHA over https (or on this computer at localhost)."));
+    screen(mark(), h("h1", {}, "Secure connection needed"), h("p", {}, "Open sha over https (or on this computer at localhost)."));
     return;
   }
   const store = await Store.open();
@@ -84,8 +84,8 @@ function welcomeScreen(store: Store): void {
   };
   screen(
     mark(),
-    h("h1", {}, "SHA, a self-hosted assistant"),
-    h("p", {}, "To use SHA, pair this device with your own computer: run ", h("code", {}, "aha pair <your name>"), " there and scan the QR code it shows."),
+    h("h1", {}, "sha, a self-hosted assistant"),
+    h("p", {}, "To use sha, pair this device with your own computer: run ", h("code", {}, "aha pair <your name>"), " there and scan the QR code it shows."),
     standalone() && onIphone()
       ? h("p", {}, "In the Home Screen app, paste the link instead: point the Camera at the QR code, touch and hold the link it shows, choose Copy, and paste it here.")
       : h("p", { class: "fine" }, "Or paste the link the QR code holds:"),
@@ -113,7 +113,7 @@ async function pairingScreen(store: Store): Promise<void> {
   copy.onclick = async () => {
     try {
       await navigator.clipboard.writeText(fullLink);
-      copy.textContent = "Copied: now open SHA from your Home Screen and paste it";
+      copy.textContent = "Copied: now open sha from your Home Screen and paste it";
     } catch {
       copy.textContent = "Couldn't copy";
     }
@@ -123,8 +123,8 @@ async function pairingScreen(store: Store): Promise<void> {
       ? h(
           "div",
           { class: "note-box" },
-          h("p", {}, h("b", {}, "Using SHA from your Home Screen?"), " Pair there, not here: on iPhone the Home Screen app keeps its own data, separate from Safari, so a pairing made in Safari isn't in it."),
-          h("p", { class: "fine" }, "Copy the link, add SHA to your Home Screen (Share → Add to Home Screen), open it from there and paste the link."),
+          h("p", {}, h("b", {}, "Using sha from your Home Screen?"), " Pair there, not here: on iPhone the Home Screen app keeps its own data, separate from Safari, so a pairing made in Safari isn't in it."),
+          h("p", { class: "fine" }, "Copy the link, add sha to your Home Screen (Share → Add to Home Screen), open it from there and paste the link."),
           copy,
         )
       : "";
@@ -142,7 +142,7 @@ async function pairingScreen(store: Store): Promise<void> {
   screen(
     mark(),
     h("h1", {}, `Hi ${data.name}`),
-    h("p", {}, `This connects this device to SHA on “${data.home}”. Everything you write is end-to-end encrypted to that computer.`),
+    h("p", {}, `This connects this device to sha on “${data.home}”. Everything you write is end-to-end encrypted to that computer.`),
     existing && !different ? h("p", { class: "error" }, "This device is already paired; pairing again replaces it.") : "",
     iphoneBox,
     different
@@ -201,7 +201,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       });
     });
     if (!got) {
-      screen(mark(), h("h1", {}, "SHA is open in another tab"), h("p", {}, "Use that tab, or close it and reload this one."));
+      screen(mark(), h("h1", {}, "sha is open in another tab"), h("p", {}, "Use that tab, or close it and reload this one."));
       return;
     }
   }
@@ -225,9 +225,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     location.href = url;
   });
   const scroller = h("main", { class: "chat" }, col);
-  const workingText = h("span", {}, " SHA is working…");
+  const workingText = h("span", {}, " sha is working…");
   const working = h("div", { class: "working", hidden: "", role: "status" }, h("i"), h("i"), h("i"), workingText);
-  const input = h("textarea", { rows: "1", placeholder: "Ask SHA anything", "aria-label": "Message", enterkeyhint: "enter", maxlength: "20000" }) as HTMLTextAreaElement;
+  const input = h("textarea", { rows: "1", placeholder: "Ask sha anything", "aria-label": "Message", enterkeyhint: "enter", maxlength: "20000" }) as HTMLTextAreaElement;
   const sendBtn = h("button", { class: "send", type: "submit", "aria-label": "Send" }, icon(ICONS.send));
   const photoBtn = h("button", { class: "attach", type: "button", "aria-label": "Add a photo" }, icon(ICONS.photo));
   const fileInput = h("input", { type: "file", accept: "image/*", hidden: "" }) as HTMLInputElement;
@@ -243,7 +243,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
-  const installHint = h("div", { class: "banner" }, "Safari may delete this pairing after 7 days without a visit. To keep SHA on your Home Screen, add it (Share → Add to Home Screen) and pair it again there: it keeps its own data, so this pairing isn't in it.");
+  const installHint = h("div", { class: "banner" }, "Safari may delete this pairing after 7 days without a visit. To keep sha on your Home Screen, add it (Share → Add to Home Screen) and pair it again there: it keeps its own data, so this pairing isn't in it.");
   installHint.hidden = !ios || installed;
   app.replaceChildren(
     h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, live.el, tasksBtn, memoryBtn, menu)),
@@ -377,8 +377,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     // A request's Details line (SPEC §7.4 "Details"): what the model is doing, live, closed until opened.
     // Where a request's work starts: nothing shows there (SPEC §7.4).
     if (it.t === "steps") return null;
-    // One thing a request did, where it happened (SPEC §7.4 "What SHA did"): the computer's line, not the model's.
-    if (it.t === "act" && typeof it.text === "string") return h("div", { class: "act", role: "note", "aria-label": "SHA did" }, h("span", { class: "tick", "aria-hidden": "true" }, "✓"), it.text);
+    // One thing a request did, where it happened (SPEC §7.4 "What sha did"): the computer's line, not the model's.
+    if (it.t === "act" && typeof it.text === "string") return h("div", { class: "act", role: "note", "aria-label": "sha did" }, h("span", { class: "tick", "aria-hidden": "true" }, "✓"), it.text);
     // A tool line from before Details lines: side info, not part of a reply.
     return null;
   }
@@ -558,16 +558,16 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     dot.className = `dot${computer ? " on" : ""}`;
     statusText.textContent = !connected ? "Connecting…" : computer ? `${identity.home} · online` : `${identity.home} · offline`;
     banner.toggleAttribute("hidden", !connected || computer);
-    banner.textContent = "Your SHA computer is offline. What you write waits here and is sent when it's back.";
+    banner.textContent = "Your sha computer is offline. What you write waits here and is sent when it's back.";
   }
 
-  // The send button turns into Stop while SHA works, but only from 1.5 s after the last send, so a double tap
+  // The send button turns into Stop while sha works, but only from 1.5 s after the last send, so a double tap
   // or a second tap on Send never cancels the message just sent (SPEC §7.4).
   const STOP_GRACE = 1500;
   let lastSend = 0;
   const stopMode = () => busy && !input.value.trim() && !photo && Date.now() - lastSend >= STOP_GRACE;
   function setBusy(on: boolean): void {
-    if (on !== busy) view.invalidate(); // while SHA works, the part going on doesn't fold
+    if (on !== busy) view.invalidate(); // while sha works, the part going on doesn't fold
     busy = on;
     working.toggleAttribute("hidden", !on);
     const stop = stopMode();
@@ -592,7 +592,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     },
     typing(on, queued) {
       // The model answers one request at a time for the household (SPEC §3.3): say when it's someone else's turn.
-      workingText.textContent = queued ? " SHA is finishing someone else's request first…" : " SHA is working…";
+      workingText.textContent = queued ? " sha is finishing someone else's request first…" : " sha is working…";
       setBusy(on);
       if (!on) details?.idle();
     },
@@ -657,8 +657,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     error(code) {
       if (code === "bad_model") settingsUi?.modelNote("That model isn't on your computer. Run `aha models` there to download it.");
       if (code === "bad_site") settingsUi?.browserNote("That isn't a web site's name. Type it like waitrose.com.");
-      if (code === "other_tab") screen(mark(), h("h1", {}, "SHA is open somewhere else"), h("p", {}, "This device connected again from another tab or window."));
-      if (code === "pin") screen(mark(), h("h1", {}, "Gateway key changed"), h("p", { class: "error" }, "The gateway's key no longer matches the one from pairing, so SHA won't connect. Pair this device again."));
+      if (code === "other_tab") screen(mark(), h("h1", {}, "sha is open somewhere else"), h("p", {}, "This device connected again from another tab or window."));
+      if (code === "pin") screen(mark(), h("h1", {}, "Gateway key changed"), h("p", { class: "error" }, "The gateway's key no longer matches the one from pairing, so sha won't connect. Pair this device again."));
     },
     async revoked() {
       client.stop();

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Axxlabs Limited
-# Create the SHA app's own server on Hetzner Cloud (SPEC §7.4), separate from the gateway's. Needs `hcloud` with the project selected.
+# Create the sha app's own server on Hetzner Cloud (SPEC §7.4), separate from the gateway's. Needs `hcloud` with the project selected.
 #   deploy/hetzner/create.sh <ssh-key-name> [server-name] [type] [location]
 # Then point DNS for $DOMAIN at the printed address; Caddy gets the certificate by itself once it resolves.
 set -euo pipefail

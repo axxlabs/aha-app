@@ -149,7 +149,7 @@ export function pair(data: PairData, deviceName = defaultDeviceName()): Promise<
       ws.close();
       reject(new Error(msg));
     };
-    const timer = setTimeout(() => fail("The computer didn't answer. Is SHA running there?"), 30_000);
+    const timer = setTimeout(() => fail("The computer didn't answer. Is sha running there?"), 30_000);
     ws.onerror = () => fail("Couldn't reach the gateway.");
     ws.onmessage = (ev) => {
       let f: any;

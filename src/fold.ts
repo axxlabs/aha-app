@@ -49,7 +49,7 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
   const titles = items.filter((it) => it.t === "title");
   // A new subject starts a part too: the computer marks the message where it starts (SPEC §7.4).
   const topics = new Set(titles.filter((t) => t.new === true).map((t) => Number(t.from)));
-  // SHA's messages that wait for your reply, as the computer said after each request (SPEC §7.4).
+  // sha's messages that wait for your reply, as the computer said after each request (SPEC §7.4).
   const waiting = new Set(titles.filter((t) => typeof t.waiting === "number").map((t) => Number(t.waiting)));
   const cuts = items.filter((it) => it.t === "cut").map((it) => it.seq);
   const cutBetween = (a: number, b: number) => cuts.some((c) => c > a && c < b);
@@ -64,8 +64,8 @@ export function plan(all: Item[], resolved: Set<string>, now: number, working = 
   return parts.map((part, i) => {
     const first = part[0].seq;
     const last = part[part.length - 1].seq;
-    // The last part is still going on until a break, or while SHA works on it.
-    // A cut after it folds it now, working or not: what SHA answers next starts a part of its own.
+    // The last part is still going on until a break, or while sha works on it.
+    // A cut after it folds it now, working or not: what sha answers next starts a part of its own.
     const live =
       i === parts.length - 1 && !cutBetween(last, Infinity) && (working || !isBreak(part[part.length - 1].ts, now));
     const named = titles.filter((t) => Number(t.from) >= first && Number(t.from) <= last).pop();

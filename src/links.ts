@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
 //
-// Where a link in SHA's replies opens (SPEC §7.4, Settings → This device → Open links). In the installed app a
+// Where a link in sha's replies opens (SPEC §7.4, Settings → This device → Open links). In the installed app a
 // link opens in a browser view over the app (iOS: a Safari sheet; Android: a Chrome tab). "In my browser" hands
 // it to the phone's browser app instead: Safari's own scheme on iOS 17+, an Android intent with no package (the
 // default browser, or the app for that link), falling back to the plain link.

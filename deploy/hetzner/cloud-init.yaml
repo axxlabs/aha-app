@@ -1,5 +1,5 @@
 #cloud-config
-# The SHA app's own server on Hetzner Cloud (SPEC §7.4), separate from the gateway's. Used by create.sh; holds
+# The sha app's own server on Hetzner Cloud (SPEC §7.4), separate from the gateway's. Used by create.sh; holds
 # no secrets. Ubuntu 24.04: an admin user with the operator's SSH key, no root or password login, automatic
 # security updates, Docker; the app is built here from the public repo and served by Caddy.
 users:
@@ -30,7 +30,7 @@ write_files:
   - path: /etc/systemd/system/aha-app-update.service
     content: |
       [Unit]
-      Description=Build and publish the SHA app from main (SPEC 7.4)
+      Description=Build and publish the sha app from main (SPEC 7.4)
       After=docker.service network-online.target
       Requires=docker.service
       [Service]

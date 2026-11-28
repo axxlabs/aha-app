@@ -1,6 +1,6 @@
 {
-  "name": "SHA, a self-hosted assistant",
-  "short_name": "SHA",
+  "name": "sha, a self-hosted assistant",
+  "short_name": "sha",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

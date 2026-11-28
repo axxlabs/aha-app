@@ -2,7 +2,7 @@
   "name": "aha-app",
   "version": "0.0.0",
   "private": true,
-  "description": "SHA, a self-hosted assistant: the end-to-end encrypted chat app",
+  "description": "sha, a self-hosted assistant: the end-to-end encrypted chat app",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {

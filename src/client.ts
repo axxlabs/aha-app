@@ -518,6 +518,7 @@ export class Client {
   private async accept(items: Item[], live: boolean): Promise<void> {
     const fresh = items.filter((it) => typeof it.seq === "number" && it.seq > 0);
     await this.store.putItems(fresh);
+    for (const it of fresh) if (it.t === "topic" && it.state === "deleted" && typeof it.topic === "number") await this.store.dropTopic(it.topic);
     for (const it of fresh) {
       if (it.t === "msg" && it.role === "me" && typeof it.cid === "string") await this.store.unqueue(it.cid);
       if (it.seq > this.last) this.last = it.seq;

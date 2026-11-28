@@ -123,6 +123,14 @@ export class Store {
     await done(tx);
   }
 
+  /** Delete the cached items of a topic the person deleted (SPEC §4.1). */
+  async dropTopic(topic: number): Promise<void> {
+    const items = await this.items();
+    const tx = this.db.transaction("items", "readwrite");
+    for (const it of items) if (it.topic === topic && it.t !== "topic") tx.objectStore("items").delete(it.seq);
+    await done(tx);
+  }
+
   /** Delete cached items numbered before `start`, whatever they are (SPEC §3.8.1). */
   async dropBefore(start: number): Promise<void> {
     const tx = this.db.transaction("items", "readwrite");

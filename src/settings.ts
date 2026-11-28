@@ -227,7 +227,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
         "section",
         {},
         h("h4", {}, "Clear"),
-        h("div", { class: "row" }, h("span", {}, "Chat history", h("small", {}, "From your computer and all your devices. Memories, scheduled topics and sign-ins stay.")), clearHistory),
+        h("div", { class: "row" }, h("span", {}, "Chat history", h("small", {}, "Deletes every topic and its messages from your computer and all your devices, and stops everything sha was checking on for you. Memories and sign-ins stay.")), clearHistory),
         h("div", { class: "row" }, h("span", {}, "Browser data", h("small", {}, "Everything sha's browser remembers: every site is forgotten, with its sign-in, saved login and trust.")), clearBrowser),
       ),
       h(
@@ -291,7 +291,7 @@ export function openSettings(store: Store, client: Client, onClose: () => void):
     }
   };
   clearHistory.onclick = async () => {
-    if (!confirm("Delete your chat history from your computer and all your devices? Memories, scheduled topics and sign-ins stay.")) return;
+    if (!confirm("Delete every topic and its messages from your computer and all your devices, and stop everything sha was checking on? Memories and sign-ins stay.")) return;
     clearHistory.disabled = true;
     if (await client.send({ t: "history_clear" })) clearHistory.textContent = "Chat history cleared";
     else {

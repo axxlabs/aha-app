@@ -74,6 +74,7 @@ export function topicsOf(all: Item[], synced: Map<number, TopicMeta>, resolved: 
   const out: Topic[] = [];
   for (const [n, items] of by) {
     const m = meta.get(n);
+    if (m?.state === "deleted") continue; // the person deleted it (its items go too, SPEC §4.1)
     const said = items.filter((it) => it.t === "msg");
     const last = Math.max(...(said.length ? said : items).map((it) => it.ts));
     const unanswered = items.some((it) => it.t === "approval" && !resolved.has(String(it.id)));

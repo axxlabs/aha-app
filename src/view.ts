@@ -20,6 +20,7 @@ export interface ViewDeps {
   busyTopic(): number; // the topic it works in (0: not known)
   strip?(n: number, s: Schedule): HTMLElement; // a scheduled topic's strip (SPEC §4.1)
   background?: HTMLElement; // "Continue in background": shown in the open topic while sha works on it
+  remove?(n: number): void; // the open topic's Delete topic (SPEC §4.1)
   opened?(n: number | null): void; // the open topic changed (the composer's placeholder)
   now?: () => number; // seconds (tests)
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
@@ -33,6 +34,7 @@ export function chatView(d: ViewDeps) {
   const boxes = new Map<number, HTMLElement>(); // the open topic's box
   const strips = new Map<number, { key: string; el: HTMLElement }>();
   const heads = new Map<string, HTMLElement>();
+  const removers = new Map<number, HTMLElement>(); // each open topic's Delete topic button
   const answered = new Set<number>(); // cards already shown as answered
   const synced = new Map<number, TopicMeta>(); // the sync's list of topics (SPEC §6.5)
   const now = d.now ?? (() => Date.now() / 1000);
@@ -181,7 +183,22 @@ export function chatView(d: ViewDeps) {
     if (working) want.push(d.working);
     if (working && d.background) want.push(d.background);
     want.push(d.composer);
+    if (d.remove && t.n) want.push(remover(t.n));
     place(el, want);
+    return el;
+  }
+
+  function remover(n: number): HTMLElement {
+    let el = removers.get(n);
+    if (!el) {
+      el = document.createElement("button");
+      el.className = "cut remove";
+      (el as HTMLButtonElement).type = "button";
+      el.textContent = "Delete topic";
+      el.title = "Delete this topic, its messages and anything it checks on";
+      el.onclick = () => d.remove?.(n);
+      removers.set(n, el);
+    }
     return el;
   }
 
@@ -267,6 +284,7 @@ export function chatView(d: ViewDeps) {
     },
     /** The sync's list of topics: their titles and states, whatever the device keeps (SPEC §4.1). */
     topics(list: TopicMeta[]): void {
+      synced.clear(); // the whole list, as the computer has it now
       for (const m of list) if (typeof m.topic === "number") synced.set(m.topic, m);
       invalidate();
     },
@@ -275,6 +293,18 @@ export function chatView(d: ViewDeps) {
       for (const it of list) {
         if (typeof it.seq !== "number" || items.has(it.seq)) continue;
         items.set(it.seq, it);
+        if (it.t === "topic" && it.state === "deleted" && typeof it.topic === "number") {
+          // The person deleted it, here or on another device: its items go (SPEC §4.1).
+          for (const [seq, x] of items) {
+            if (x.topic !== it.topic || x.t === "topic") continue;
+            items.delete(seq);
+            els.delete(seq);
+          }
+          if (open === it.topic) {
+            open = null;
+            d.opened?.(null);
+          }
+        }
         if (it.t === "msg" && it.role === "me" && typeof it.cid === "string") {
           const p = pending.get(it.cid);
           pending.delete(it.cid); // echoed back

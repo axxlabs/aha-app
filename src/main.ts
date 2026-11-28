@@ -276,6 +276,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     busyTopic: () => busyTopic,
     strip: (n, sched) => scheduleStrip(client, n, sched, () => client.settings.dates ?? "short"),
     background: backgroundBtn,
+    remove(n) {
+      if (!confirm(`Delete topic #${n}? Its messages go from your computer and all your devices, and it stops anything it was checking on.`)) return;
+      void client.send({ t: "topic_delete", topic: n });
+    },
     opened(n) {
       input.placeholder = n ? `Reply in #${n}…` : "New topic…";
     },

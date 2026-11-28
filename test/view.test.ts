@@ -125,6 +125,15 @@ describe("the chat view (SPEC §4.1, §7.4)", () => {
     expect(made()).toBe(count + 1); // only the new item's element was made
   });
 
+  it("a deleted topic goes, with its messages; the one going on before it opens instead", () => {
+    const { view, shown } = setup();
+    view.add([me(1, T - 60, "keep"), me(2, T, "gone")]);
+    expect(view.opened()).toBe(2);
+    view.add([{ seq: ++n, ts: T + 5, t: "topic", topic: 2, title: "", state: "deleted" } as Item]);
+    expect(shown()).toEqual(["▾keep", "keep", "[composer]"]);
+    expect(view.opened()).toBe(1);
+  });
+
   it("drops what's before the history's start", () => {
     const { view, col } = setup();
     view.add([me(1, T, "old")]);

@@ -134,7 +134,8 @@ export function chatView(d: ViewDeps) {
     const time = document.createElement("time");
     time.textContent = lineTime(t.last);
     const icon = stateIcon(t);
-    el.replaceChildren(chevron, ...(t.n ? [num] : []), title, ...(icon ? [icon] : []), time);
+    // Open, its messages say when they came; closed, the line says when the last one did.
+    el.replaceChildren(chevron, ...(t.n ? [num] : []), title, ...(icon ? [icon] : []), ...(isOpen ? [] : [time]));
     if (t.needsInput && t.question && !isOpen) {
       const q = document.createElement("span");
       q.className = "question";

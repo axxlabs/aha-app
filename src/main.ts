@@ -16,7 +16,7 @@ import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
 import { dayWords } from "./fold";
 import { scheduleStrip } from "./topics";
-import { render } from "./markdown";
+import { formatDate, render } from "./markdown";
 import { externalUrl, platform, standalone } from "./links";
 import { type Item, type Photo, Store } from "./store";
 
@@ -319,6 +319,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       el.innerHTML = render(text, accounts, client.settings.dates); // html disabled; labels
       const img = it.image as { mime?: string; b64?: string } | undefined;
       if (img && /^image\/(png|jpeg|webp)$/.test(img.mime ?? "")) el.append(h("img", { class: "shot", alt: "Screenshot", src: `data:${img.mime};base64,${img.b64}` }));
+      // When it came, at its foot (SPEC §7.4): the open topic's line no longer says it.
+      if (text.trim() || img) el.append(h("time", { class: "msg-time" }, stamp(it.ts)));
       const run = typeof it.run === "string" ? it.run : "";
       if (run) {
         // A request's answer (SPEC §7.4): what it did is already in the chat, where each thing happened; its
@@ -337,6 +339,13 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (it.t === "act" && typeof it.text === "string") return h("div", { class: "act", role: "note", "aria-label": "sha did" }, h("span", { class: "tick", "aria-hidden": "true" }, "✓"), it.text);
     // A tool line from before Details lines: side info, not part of a reply.
     return null;
+  }
+
+  /** A message's time: HH:MM today, else its date too, in the device's date format. */
+  function stamp(ts: number): string {
+    const d = new Date(ts * 1000);
+    const clock = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return new Date().toDateString() === d.toDateString() ? clock : `${formatDate(d, client.settings.dates)} ${clock}`;
   }
 
   function approvalCard(it: Item): HTMLElement {

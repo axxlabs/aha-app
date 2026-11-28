@@ -241,6 +241,9 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // The message box: inside the open topic, or at the bottom for a new topic (SPEC §4.1 "Routing").
   const composer = h("div", { class: "composer-in" }, attachment, form);
   const footer = h("footer", { class: "composer" }, composer);
+  // At the very end of the chat while a topic is open: closes it, and the bar at the bottom starts a new topic.
+  const collapseAllBtn = h("button", { class: "cut collapse-all", type: "button", title: "Close the open topic" }, "[collapse all]");
+  collapseAllBtn.onclick = () => view.open(null);
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
@@ -266,6 +269,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     working,
     composer,
     footer,
+    collapseAll: collapseAllBtn,
     node,
     resolve: (it, st) => applyState(String(it.id), st),
     dayLabel,

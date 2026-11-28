@@ -21,6 +21,7 @@ export interface ViewDeps {
   waking?(): number; // a topic that woke up on its own and works now (0: none): its line shows it, nothing else
   strip?(n: number, s: Schedule): HTMLElement; // a scheduled topic's strip (SPEC §4.1)
   remove?(n: number): void; // the open topic's Delete topic (SPEC §4.1)
+  collapseAll?: HTMLElement; // [collapse all]: at the very end of the chat, while a topic is open
   opened?(n: number | null): void; // the open topic changed (the composer's placeholder)
   now?: () => number; // seconds (tests)
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
@@ -250,6 +251,7 @@ export function chatView(d: ViewDeps) {
     if (d.busy() && (open === null || d.busyTopic() !== open) && !list.some((x) => x.n === d.busyTopic())) {
       want.push(d.working); // working on something not drawn yet (a new topic)
     }
+    if (open !== null && d.collapseAll) want.push(d.collapseAll); // after everything, where scrolling ends
     place(d.col, want);
     if (open === null && d.composer.parentElement !== d.footer) d.footer.append(d.composer);
     d.footer.hidden = open !== null;

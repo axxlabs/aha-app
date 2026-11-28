@@ -344,3 +344,4 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
 .topic-box > .remove { align-self: flex-end; margin: -14px 0 -6px; }
 .topic-box > .remove:hover, .topic-box > .remove:focus-visible { color: var(--warn); }
 .aha .msg-time { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.col > .collapse-all { align-self: flex-end; margin-top: -6px; }

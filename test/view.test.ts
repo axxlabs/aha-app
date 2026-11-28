@@ -19,6 +19,8 @@ function setup(now = T + 600, busyTopic = 0, waking = 0) {
   const composer = document.createElement("form");
   composer.className = "composer-in";
   const footer = document.createElement("footer");
+  const collapseAll = document.createElement("button");
+  collapseAll.className = "collapse-all";
   const opened: (number | null)[] = [];
   let made = 0;
   const view = chatView({
@@ -27,6 +29,7 @@ function setup(now = T + 600, busyTopic = 0, waking = 0) {
     working,
     composer,
     footer,
+    collapseAll,
     node: (it) => {
       if (it.t !== "msg" && it.t !== "approval") return null;
       made++;
@@ -50,7 +53,7 @@ function setup(now = T + 600, busyTopic = 0, waking = 0) {
     [...col.querySelectorAll(".fold, .me, .aha, .card, .composer-in")].map((el) =>
       el.classList.contains("fold") ? `${el.classList.contains("open") ? "▾" : "▸"}${el.querySelector(".title")?.textContent}` : el.classList.contains("composer-in") ? "[composer]" : (el.textContent ?? ""),
     );
-  return { col, view, shown, footer, composer, opened, made: () => made };
+  return { col, view, shown, footer, composer, collapseAll, opened, made: () => made };
 }
 
 describe("the chat view (SPEC §4.1, §7.4)", () => {
@@ -69,6 +72,14 @@ describe("the chat view (SPEC §4.1, §7.4)", () => {
     expect(view.opened()).toBe(null);
     expect(footer.hidden).toBe(false);
     expect(composer.parentElement).toBe(footer);
+  });
+
+  it("[collapse all] is last in the chat while a topic is open, and only then", () => {
+    const { view, col, collapseAll } = setup();
+    view.add([me(1, T - 60, "first"), me(2, T, "second")]);
+    expect(col.lastElementChild).toBe(collapseAll);
+    view.open(null);
+    expect(col.contains(collapseAll)).toBe(false);
   });
 
   it("one topic open at a time: opening one closes the other, and its line closes it", () => {

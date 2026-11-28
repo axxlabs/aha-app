@@ -14,8 +14,8 @@ import { detailsLines } from "./details";
 import { statsPanel } from "./stats";
 import { type SettingsUi, openSettings } from "./settings";
 import { type MemoryUi, openMemory } from "./memory";
-import { type BackgroundTask, type TasksUi, everyWords, openTasks, runningCards, startedMarks } from "./tasks";
-import { NOTE_KINDS, type Part, dayWords, gist } from "./fold";
+import { dayWords } from "./fold";
+import { scheduleStrip } from "./topics";
 import { render } from "./markdown";
 import { receipt, receiptLines } from "./receipt";
 import { externalUrl, platform, standalone } from "./links";
@@ -191,6 +191,12 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   if (!state) return welcomeScreen(store);
   const ratchet = Ratchet.fromJSON(state);
   const settings: Settings = { ...DEFAULT_SETTINGS, ...((await store.get<Settings>("settings")) ?? {}) };
+  // Items cached before topics (SPEC §4.1) have none: drop them once, and the sync brings them back with theirs.
+  if ((await store.get<number>("items_v")) !== 2) {
+    await store.clearItems();
+    await store.put("last", 0);
+    await store.put("items_v", 2);
+  }
 
   // One tab at a time uses the ratchet (SPEC §6.3).
   if ("locks" in navigator) {
@@ -212,7 +218,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const live = statsPanel(); // between "home · online" and the buttons (SPEC §7.4 "Live diagnostics")
   const menu = h("button", { class: "icon-btn", type: "button", "aria-label": "Settings", title: "Settings" }, icon(ICONS.gear));
   const memoryBtn = h("button", { class: "icon-btn", type: "button", "aria-label": "Memory", title: "Memory" }, icon(ICONS.memory));
-  const tasksBtn = h("button", { class: "icon-btn", type: "button", "aria-label": "Tasks", title: "Tasks" }, icon(ICONS.tasks));
   const banner = h("div", { class: "banner", hidden: "" });
   const col = h("div", { class: "col" });
   // A link in a reply, in the installed app with "In my browser" chosen: hand it to the phone's browser (links.ts).
@@ -227,83 +232,54 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const scroller = h("main", { class: "chat" }, col);
   const workingText = h("span", {}, " sha is working…");
   const working = h("div", { class: "working", hidden: "", role: "status" }, h("i"), h("i"), h("i"), workingText);
-  const input = h("textarea", { rows: "1", placeholder: "Ask sha anything", "aria-label": "Message", enterkeyhint: "enter", maxlength: "20000" }) as HTMLTextAreaElement;
+  const input = h("textarea", { rows: "1", placeholder: "New topic…", "aria-label": "Message", enterkeyhint: "enter", maxlength: "20000" }) as HTMLTextAreaElement;
   const sendBtn = h("button", { class: "send", type: "submit", "aria-label": "Send" }, icon(ICONS.send));
   const photoBtn = h("button", { class: "attach", type: "button", "aria-label": "Add a photo" }, icon(ICONS.photo));
   const fileInput = h("input", { type: "file", accept: "image/*", hidden: "" }) as HTMLInputElement;
   const attachment = h("div", { class: "attachment", hidden: "" });
   let photo: Photo | null = null;
   const form = h("form", {}, photoBtn, fileInput, input, sendBtn);
-  // Fold the conversation going on now, on every device; the next message starts a new part (SPEC §7.4).
-  const cutBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold this conversation away: what you write next starts a new topic" }, "[close current conversation into new topic]");
-  cutBtn.onclick = () => void client.send({ t: "cut" });
-  const collapseAllBtn = h("button", { class: "cut", type: "button", hidden: "", title: "Fold every topic you opened" }, "[collapse all]");
-  collapseAllBtn.onclick = () => view.collapseAll();
-  const chatActions = h("div", { class: "chat-actions" }, collapseAllBtn, cutBtn);
+  // The message box: inside the open topic, or at the bottom for a new topic (SPEC §4.1 "Routing").
+  const composer = h("div", { class: "composer-in" }, attachment, form);
+  const footer = h("footer", { class: "composer" }, composer);
+  // While sha works on the open topic: let it carry on, and free the chat for another topic (SPEC §4.1).
+  const backgroundBtn = h("button", { class: "cut", type: "button", title: "sha carries on; what you write next starts a new topic" }, "Continue in background");
+  backgroundBtn.onclick = () => view.open(null);
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
   const installHint = h("div", { class: "banner" }, "Safari may delete this pairing after 7 days without a visit. To keep sha on your Home Screen, add it (Share → Add to Home Screen) and pair it again there: it keeps its own data, so this pairing isn't in it.");
   installHint.hidden = !ios || installed;
   app.replaceChildren(
-    h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, live.el, tasksBtn, memoryBtn, menu)),
+    h("header", { class: "top" }, mark(), h("div", { class: "right" }, statusBox, live.el, memoryBtn, menu)),
     installHint,
     banner,
     scroller,
-    h("footer", { class: "composer" }, attachment, form),
+    footer,
   );
 
   const cards = new Map<string, { el: HTMLElement; resolved: boolean }>();
   let busy = false;
+  let busyTopic = 0; // the topic sha works in (SPEC §4.1)
   let historyStart = 1; // the first message the computer still holds (SPEC §3.8.1)
   // The chat view (src/view.ts): the items are its only state, and it draws everything from them.
   const view = chatView({
     col,
     scroller,
     working,
+    composer,
+    footer,
     node,
     resolve: (it, st) => applyState(String(it.id), st),
     dayLabel,
     busy: () => busy,
-    marks,
-    cut: cutBtn,
-    collapseAll: collapseAllBtn,
-    actions: chatActions,
+    busyTopic: () => busyTopic,
+    strip: (n, sched) => scheduleStrip(client, n, sched, () => client.settings.dates ?? "short"),
+    background: backgroundBtn,
+    opened(n) {
+      input.placeholder = n ? `Reply in #${n}…` : "New topic…";
+    },
   });
-  // The background tasks, to mark the topics that started them (null until the computer sent the list).
-  let tasks: BackgroundTask[] | null = null;
-
-  /** Which task cards' tasks still run, over the whole chat (a task belongs to one card only). */
-  function running(states: Map<string, string>): Map<string, BackgroundTask> | null {
-    const cards = [...view.items.values()].filter((it) => it.t === "approval" && it.kind === "task").map((it) => ({ id: String(it.id), ts: it.ts }));
-    return runningCards(cards, states, tasks);
-  }
-
-  /** A folded topic's icons (SPEC §7.4 "Folding"): a small box for each kind of task note in it, drawn like the
-   * note itself, and the tasks it started, still running or ended. Each is a button with the (i)'s popup: which
-   * task, and the gist of what it found. */
-  function marks(p: Part, states: Map<string, string>): Node[] {
-    const mark = (face: Node, label: string, ...lines: Node[]) => h("span", { class: "mark-wrap" }, ...infoPopup(h("div", {}, ...lines), label, "mark", face));
-    const line = (title: string, words: string) => h("p", {}, h("b", {}, title || "A background task"), words ? h("small", {}, words) : "");
-    const run = running(states);
-    const started = startedMarks(p.started, states, run).map(({ running: on, cards }) => {
-      const head = `Started here: ${cards.length > 1 ? `${cards.length} background tasks` : "a background task"}, ${on ? "still running" : "ended"}`;
-      const lines = cards.map((c) => {
-        const t = run?.get(c.id);
-        return line(t?.title || c.title, !on ? "" : t?.last ? `Last check: ${gist(t.last)}` : "Not checked yet");
-      });
-      return mark(h("span", { class: `task-mark ${on ? "running" : "ended"}` }, icon(ICONS.tasks)), head, h("header", {}, head), ...lines);
-    });
-    const heads: Record<string, string> = { update: "Task update", done: "Task done", failed: "Task failed" };
-    const notes = NOTE_KINDS.flatMap((k) => {
-      const of = p.notes.filter((n) => n.kind === k);
-      if (!of.length) return [];
-      const head = of.length > 1 ? `${heads[k]} ×${of.length}` : heads[k];
-      // The latest three, newest last, as in the chat.
-      return [mark(h("span", { class: `note-mark ${k}` }), `${head} in this topic`, h("header", { class: k }, head), ...of.slice(-3).map((n) => line(n.title, gist(n.text))))];
-    });
-    return [...started, ...notes];
-  }
 
   const toBottom = view.toBottom;
 
@@ -327,15 +303,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   }
   window.addEventListener("aha-dates", () => view.remake((it) => it.t === "msg" && it.role === "aha"));
 
-  /** A background task's note on a message: its kind's words and the task's title, or null. */
-  function taskNote(task: unknown): { kind: string; head: string; title: string; prompt: string; every: number } | null {
-    if (!task || typeof task !== "object") return null;
-    const { kind, title, prompt, every } = task as { kind?: unknown; title?: unknown; prompt?: unknown; every?: unknown };
-    const heads: Record<string, string> = { update: "Task update", done: "Task done", failed: "Task failed" };
-    const k = typeof kind === "string" && kind in heads ? kind : "update";
-    return { kind: k, head: heads[k], title: typeof title === "string" ? title : "", prompt: typeof prompt === "string" ? prompt : "", every: typeof every === "number" && every > 0 ? every : 0 };
-  }
-
   function node(it: Item): HTMLElement | null {
     if (it.t === "msg" && it.role === "me") {
       const el = h("div", { class: "me" }, String(it.text ?? ""));
@@ -356,22 +323,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
         const tail = details ? [details.line(it.seq, run)] : [];
         return h("div", { class: "aha-turn" }, ...(text.trim() || img ? [el] : []), ...tail);
       }
-      // A background task's note, or an answer from before boxes: the receipt, drawn apart from the model's words.
+      // A wakeup's message, or an answer from before boxes: the receipt, drawn apart from the model's words.
       const done = receiptLines(it.record);
       const rec = done.length ? receipt(done) : null;
-      const body = rec && !text.trim() && !img ? rec : rec ? h("div", { class: "aha-turn" }, el, rec) : el;
-      const note = taskNote(it.task);
-      if (note) {
-        // A background task's news (SPEC §7.4 "Task notes"): a box with a small title saying which task ran.
-        const box = h("section", { class: `task-note ${note.kind}`, "aria-label": `${note.head}: ${note.title}` }, h("header", {}, h("b", {}, note.head), h("span", {}, note.title)), body);
-        // Its (i): the task's full description, what each check does and how often (SPEC §7.4 "Task notes").
-        if (note.prompt) {
-          const about = h("div", {}, h("b", {}, note.title), h("p", {}, note.prompt), note.every ? h("small", {}, everyWords(note.every)) : "");
-          box.append(...infoPopup(about, "What this task does", "about"));
-        }
-        return box;
-      }
-      return body;
+      return rec && !text.trim() && !img ? rec : rec ? h("div", { class: "aha-turn" }, el, rec) : el;
     }
     if (it.t === "approval") return approvalCard(it);
     // A request's Details line (SPEC §7.4 "Details"): what the model is doing, live, closed until opened.
@@ -443,10 +398,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       };
       card.append(frame, h("p", { class: "fine" }, "Tap the picture where you'd click, then send your taps. When the check is done, tap “It's done”."), undo);
     } else if (shot) card.append(shot);
-    // "Always allow for this task" (SPEC §5.3): on every action card; ticked, the same action isn't asked again
-    // in this request, or in any of a background task's checks.
+    // "Always allow for this topic" (SPEC §4.1, §5.3): on every action card; ticked, the same action isn't asked
+    // again in this topic, its wakeups included, until it's done.
     const always = it.always === true ? (h("input", { type: "checkbox" }) as HTMLInputElement) : null;
-    card.append(dl, ...(always ? [h("label", { class: "always" }, always, h("span", {}, "Always allow for this task"))] : []), actions, stateEl);
+    card.append(dl, ...(always ? [h("label", { class: "always" }, always, h("span", {}, "Always allow for this topic"))] : []), actions, stateEl);
     let editing = false;
     // A sign-in card's inputs are open from the start: the person types into them (SPEC §5.3). A check card's
     // only input is the screenshot.
@@ -531,12 +486,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       });
     }
     cards.set(id, { el: card, resolved: false });
-    // A background task's check asks (SPEC §7.4): the card is drawn in that task's box, like its notes.
-    const task = it.task && typeof it.task === "object" ? (it.task as { title?: unknown }) : null;
-    if (task) {
-      const title = typeof task.title === "string" ? task.title : "";
-      return h("section", { class: "task-note asks", "aria-label": `Task asks: ${title}` }, h("header", {}, h("b", {}, "Task asks"), h("span", {}, title)), card);
-    }
     return card;
   }
 
@@ -577,10 +526,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     if (on && view.atBottom()) toBottom();
   }
 
-  function showPending(cid: string, text: string, sent: boolean, image?: Photo): void {
+  function showPending(cid: string, text: string, sent: boolean, image?: Photo, topic = 0): void {
     const el = h("div", { class: "me pending" }, text, h("span", { class: "note" }, sent ? "Sending…" : "Waiting for your computer"));
     if (image) el.prepend(h("img", { class: "photo", alt: "Your photo", src: `data:${image.mime};base64,${image.b64}` }));
-    view.sending(cid, el);
+    view.sending(cid, el, topic);
   }
 
   const client = new Client(store, identity, ratchet, settings, {
@@ -590,9 +539,10 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       // which turned it off at every message a task sends while it carries on (SPEC §3.3).
       if (live) view.invalidate(true);
     },
-    typing(on, queued) {
+    typing(on, queued, topic) {
       // The model answers one request at a time for the household (SPEC §3.3): say when it's someone else's turn.
       workingText.textContent = queued ? " sha is finishing someone else's request first…" : " sha is working…";
+      busyTopic = on ? topic || busyTopic : 0;
       setBusy(on);
       if (!on) details?.idle();
     },
@@ -603,7 +553,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
       if (s.computer && !askedAccounts) {
         askedAccounts = true;
         void client.send({ t: "connections_request" });
-        void client.send({ t: "tasks_request" }); // which topics' tasks still run (their fold lines' icons)
       }
       for (const [, el] of view.pendingEntries()) {
         const note = el.querySelector(".note");
@@ -624,10 +573,8 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     memories(list, topics) {
       memoryUi?.show(list, topics);
     },
-    tasks(state) {
-      tasksUi?.show(state);
-      tasks = state.items;
-      view.invalidate();
+    topics(list) {
+      view.topics(list);
     },
     devices(list) {
       settingsUi?.showDevices(list);
@@ -674,7 +621,7 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   const cached = await store.items();
   view.add(cached);
   // a pending approval's card stays usable only if no state was recorded for it
-  for (const m of await store.outbox()) showPending(m.cid, m.text, false, m.image);
+  for (const m of await store.outbox()) showPending(m.cid, m.text, false, m.image, m.topic ?? 0);
   view.draw();
   toBottom();
   setStatus(false, false);
@@ -774,18 +721,17 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     lastSend = Date.now();
     setTimeout(() => setBusy(busy), STOP_GRACE + 50);
     grow();
-    const cid = await client.say(text, image);
-    showPending(cid, text, client.computer, image);
+    const topic = view.opened() ?? 0; // the open topic, or a new one (SPEC §4.1 "Routing")
+    const cid = await client.say(text, image, topic);
+    showPending(cid, text, client.computer, image, topic);
   });
 
-  // Settings, Memory and Tasks share the side pane: each button toggles its own, and opening one closes the others.
+  // Settings and Memory share the side pane: each button toggles its own, and opening one closes the other.
   let settingsUi: SettingsUi | null = null;
   let memoryUi: MemoryUi | null = null;
-  let tasksUi: TasksUi | null = null;
   const closePanes = () => {
     settingsUi?.close();
     memoryUi?.close();
-    tasksUi?.close();
   };
   menu.onclick = () => {
     if (settingsUi) return settingsUi.close();
@@ -797,23 +743,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     closePanes();
     memoryUi = openMemory(client, () => (memoryUi = null));
   };
-  tasksBtn.onclick = () => {
-    if (tasksUi) return tasksUi.close();
-    closePanes();
-    tasksUi = openTasks(client, () => (tasksUi = null), {
-      // A task's latest note in the chat (it carries the task's id), for the panel's link to it.
-      latest(id) {
-        let found: { seq: number; text: string } | null = null;
-        for (const it of view.items.values()) {
-          const task = it.task as { id?: unknown } | undefined;
-          if (it.t === "msg" && task?.id === id && (!found || it.seq > found.seq)) found = { seq: it.seq, text: String(it.text ?? "") };
-        }
-        return found;
-      },
-      reveal: (seq) => view.reveal(seq),
-    });
-  };
-
   // A break can happen while the app is open in the background: fold when it's looked at again.
   document.addEventListener("visibilitychange", () => {
     watchStats();

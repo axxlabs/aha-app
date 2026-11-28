@@ -6,12 +6,12 @@
 
 import * as c from "./crypto";
 import type { DateFormat } from "./markdown";
+import type { TopicMeta } from "./fold";
 import type { Item, Photo, Store } from "./store";
-import type { TasksState } from "./tasks";
 
 // SPEC §10.2: "hot-staging" for now, named by the build's commit; an incremental release number once releases start.
 export const APP_VERSION = "hot-staging";
-const LEGACY_ITEMS = new Set(["msg", "approval", "approval_state", "title", "cut"]);
+const LEGACY_ITEMS = new Set(["msg", "approval", "approval_state"]);
 /** A chat item (kept, synced, drawn), not a control frame: the computer marks them (SPEC §6.5). */
 export const isItem = (msg: { t?: unknown; item?: unknown; seq?: unknown; [k: string]: unknown }): boolean =>
   typeof msg.seq === "number" && (msg.item === true || LEGACY_ITEMS.has(String(msg.t)));
@@ -71,7 +71,8 @@ export function cacheDays(settings: Settings): number {
 
 /** Drop cached items older than the device keeps (SPEC §7.5); approval cards are kept while they may be open. */
 export function pruneCache(store: Store, settings: Settings): Promise<void> {
-  return store.prune(Math.floor(Date.now() / 1000) - cacheDays(settings) * 86400, (it) => it.t === "approval");
+  // Cards may still be open, and a topic's latest `topic` item says what it is however old (SPEC §4.1).
+  return store.prune(Math.floor(Date.now() / 1000) - cacheDays(settings) * 86400, (it) => it.t === "approval" || it.t === "topic");
 }
 
 export const HISTORY_CHOICES: [number | null, string][] = [
@@ -282,13 +283,13 @@ export function browserSites(raw: unknown): BrowserSite[] {
 
 export interface Events {
   item(it: Item, live: boolean): void;
-  typing(on: boolean, queued?: boolean): void; // queued: waiting while someone else's request runs
+  typing(on: boolean, queued?: boolean, topic?: number): void; // queued: waiting while someone else's request runs; topic: where
   status(s: { connected: boolean; computer: boolean }): void;
   history(items: Item[]): void;
   historyStart(start: number): void; // items before `start` were deleted on the computer
   historySettings(days: number | null): void;
   memories(items: { id: string; text: string }[], topics: { id: string; title: string; text: string; ts: number }[]): void;
-  tasks(state: TasksState): void; // the background tasks and the idle time (SPEC §3.4)
+  topics(list: TopicMeta[]): void; // every topic's title and state, with each sync (SPEC §4.1)
   devices(items: { id: string; name: string; created: number; last_seen: number; this: boolean }[]): void;
   browser(sites: BrowserSite[]): void;
   connections(emails: string[]): void; // every connected account (SPEC §3.4 "Connections")
@@ -403,7 +404,7 @@ export class Client {
       await this.send({ t: "hello", name: this.identity.deviceName, version: `${APP_VERSION} (${APP_BUILD})`, ...(await this.pushField()) });
     }
     await this.send({ t: "sync_request", after: this.last, ...(this.last === 0 ? { days: cacheDays(this.settings) } : {}) });
-    for (const m of await this.store.outbox()) await this.send({ t: "say", text: m.text, cid: m.cid, ...(m.image ? { image: m.image } : {}) });
+    for (const m of await this.store.outbox()) await this.send({ t: "say", text: m.text, cid: m.cid, ...(m.image ? { image: m.image } : {}), ...(m.topic ? { topic: m.topic } : {}) });
   }
 
   private async pushField(): Promise<{ push?: unknown }> {
@@ -440,11 +441,12 @@ export class Client {
     }
     switch (msg.t) {
       case "typing":
-        this.on.typing(!!msg.on, msg.queued === true);
+        this.on.typing(!!msg.on, msg.queued === true, typeof msg.topic === "number" ? msg.topic : 0);
         break;
       case "sync":
         if (typeof msg.start === "number") await this.dropBefore(msg.start);
         await this.accept((msg.items ?? []) as Item[], false);
+        if (Array.isArray(msg.topics)) this.on.topics(msg.topics.filter((m: { topic?: unknown }) => typeof m?.topic === "number"));
         // Whether a reply is owed now: the `typing` messages sent while this device was offline never came.
         if (typeof msg.working === "boolean") this.on.typing(msg.working);
         break;
@@ -464,14 +466,6 @@ export class Client {
         break;
       case "memories":
         this.on.memories(msg.items ?? [], Array.isArray(msg.topics) ? msg.topics : []);
-        break;
-      case "tasks":
-        this.on.tasks({
-          items: Array.isArray(msg.items) ? msg.items : [],
-          idle_since: Number(msg.idle_since) || 0,
-          idle_after: Number(msg.idle_after) || 300,
-          busy: msg.busy === true,
-        });
         break;
       case "devices":
         this.on.devices(msg.items ?? []);
@@ -532,10 +526,11 @@ export class Client {
     await this.store.put("last", this.last);
   }
 
-  async say(text: string, image?: Photo): Promise<string> {
+  /** A message, in topic `topic` (the one open), or starting a new topic (0) (SPEC §4.1 "Routing"). */
+  async say(text: string, image?: Photo, topic = 0): Promise<string> {
     const cid = c.b64e(c.randomBytes(9)).replace(/[+/=]/g, "x");
-    await this.store.queue({ cid, text, ts: Math.floor(Date.now() / 1000), ...(image ? { image } : {}) });
-    if (this.computer) await this.send({ t: "say", text, cid, ...(image ? { image } : {}) });
+    await this.store.queue({ cid, text, ts: Math.floor(Date.now() / 1000), ...(image ? { image } : {}), ...(topic ? { topic } : {}) });
+    if (this.computer) await this.send({ t: "say", text, cid, ...(image ? { image } : {}), ...(topic ? { topic } : {}) });
     return cid;
   }
 }

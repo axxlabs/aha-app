@@ -79,7 +79,7 @@ describe("history (SPEC §3.8.1, §7.5)", () => {
 describe("chat items (SPEC §6.5)", () => {
   it("anything the computer marks as an item is kept, live too; control frames aren't", () => {
     expect(isItem({ t: "a_kind_added_later", seq: 9, item: true })).toBe(true); // no list to forget to update
-    expect(isItem({ t: "title", seq: 9 })).toBe(true); // a computer from before the mark
+    expect(isItem({ t: "approval", seq: 9 })).toBe(true); // a computer from before the mark
     expect(isItem({ t: "trace", seq: 9, events: [] })).toBe(false); // has a seq, but isn't an item
     expect(isItem({ t: "typing" })).toBe(false);
     expect(isItem({ t: "msg", item: true })).toBe(false); // an item has a number

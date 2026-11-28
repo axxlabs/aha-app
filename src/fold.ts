@@ -1,31 +1,43 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
-// Folding the chat (SPEC §7.4 "Folding"). The app's own view: a break is two hours without a message, or a new
-// day. A new subject the computer marked starts a part of its own, and so does a cut (the person's [collapse]:
-// everything before it folds at once). Each part before a break folds into one grey line with
-// its title; what's unfinished stays open; the part still going on doesn't fold and has no title.
+// Topics (SPEC §4.1, §7.4): every chat item belongs to a numbered topic. The chat is the list of topics, oldest to
+// newest by their last message, grouped by that day (…, Yesterday, Today); the topics waiting on the person come
+// last, under Needs input, right above the composer. One topic is open at a time; the rest are one line each.
 import { type DateFormat, formatDate } from "./markdown";
 import type { Item } from "./store";
 
 export const BREAK_SECONDS = 2 * 3600;
 
-export interface Part {
-  first: number; // seq of its first item
-  last: number;
-  ts: number; // when it started
+/** A topic as the computer describes it (`topic` items and the sync's list, SPEC §6.5). */
+export interface TopicMeta {
+  topic: number;
   title: string;
-  n?: number; // its topic's number (SPEC §7.4 "Topic numbers"), when the computer gave one
-  folded: boolean; // false for the part still going on
-  open: Set<number>; // seqs that stay visible while it's folded
-  notes: Note[]; // its background task notes, in order
-  started: { id: string; ts: number; title: string }[]; // its "Start this background task?" cards, with the task's title
+  state: string; // "" | scheduled | waiting | done | failed
+  last?: number;
+  question?: string;
+  schedule?: Schedule;
 }
 
-export const NOTE_KINDS = ["update", "done", "failed"];
-export interface Note {
-  kind: string; // update | done | failed
-  title: string; // the task's
-  text: string; // what it said
+export interface Schedule {
+  waiting_for: string;
+  prompt: string;
+  done_when: string;
+  every: number; // seconds
+  at?: string[];
+  next: number;
+  checks: number;
+  paused: boolean;
+}
+
+export interface Topic {
+  n: number;
+  items: Item[]; // what the chat shows of it, oldest first
+  title: string;
+  state: string;
+  question: string;
+  schedule?: Schedule;
+  last: number; // when its last message was
+  needsInput: boolean; // it waits on the person: a question, or a card not answered yet
 }
 
 /** An item the chat shows, as aha_local/folding.py SHOWN: a message, a card, a Details line, a thing done. */
@@ -37,74 +49,64 @@ export const isBreak = (before: number, after: number) => after - before >= BREA
 function firstWords(items: Item[]): string {
   const mine = items.find((it) => it.t === "msg" && it.role === "me" && String(it.text ?? "").trim());
   const words = String(mine?.text ?? "").trim().split(/\s+/);
-  if (!words[0]) return "Earlier";
+  if (!words[0]) return "Untitled";
   return words.length > 7 ? `${words.slice(0, 7).join(" ").replace(/[,.;:!?]+$/, "")}…` : words.join(" ");
 }
 
-/** The parts of the chat and what shows of each. `resolved`: the approval ids that have a state; `working`: a
- * task is running now. */
-export function plan(all: Item[], resolved: Set<string>, now: number, working = false): Part[] {
-  const items = [...all].sort((a, b) => a.seq - b.seq);
-  const chat = items.filter(shown);
-  const titles = items.filter((it) => it.t === "title");
-  // A new subject starts a part too: the computer marks the message where it starts (SPEC §7.4).
-  const topics = new Set(titles.filter((t) => t.new === true).map((t) => Number(t.from)));
-  // sha's messages that wait for your reply, as the computer said after each request (SPEC §7.4).
-  const waiting = new Set(titles.filter((t) => typeof t.waiting === "number").map((t) => Number(t.waiting)));
-  const cuts = items.filter((it) => it.t === "cut").map((it) => it.seq);
-  const cutBetween = (a: number, b: number) => cuts.some((c) => c > a && c < b);
-  const lastMine = Math.max(0, ...chat.filter((it) => it.role === "me").map((it) => it.seq));
-  const parts: Item[][] = [];
-  for (const it of chat) {
-    const cur = parts[parts.length - 1];
-    const prev = cur?.[cur.length - 1];
-    if (!prev || isBreak(prev.ts, it.ts) || topics.has(it.seq) || cutBetween(prev.seq, it.seq)) parts.push([it]);
-    else cur.push(it);
+/** What's known of each topic, from its `topic` items (the latest wins) over the sync's list. */
+export function metaOf(all: Item[], synced: Map<number, TopicMeta>): Map<number, TopicMeta> {
+  const out = new Map(synced);
+  for (const it of [...all].sort((a, b) => a.seq - b.seq)) {
+    if (it.t === "topic" && typeof it.topic === "number") out.set(it.topic, it as unknown as TopicMeta);
   }
-  return parts.map((part, i) => {
-    const first = part[0].seq;
-    const last = part[part.length - 1].seq;
-    // The last part is still going on until a break, or while sha works on it.
-    // A cut after it folds it now, working or not: what sha answers next starts a part of its own.
-    const live =
-      i === parts.length - 1 && !cutBetween(last, Infinity) && (working || !isBreak(part[part.length - 1].ts, now));
-    const named = titles.filter((t) => Number(t.from) >= first && Number(t.from) <= last).pop();
-    // Its topic's number: the latest titled part starting at or before its end, with no cut between (a part split
-    // off by a break keeps its topic's number).
-    const covering = titles
-      .filter((t) => typeof t.n === "number" && Number(t.from) <= last && !cutBetween(Number(t.from), first))
-      .sort((a, b) => Number(a.from) - Number(b.from))
-      .pop();
-    const open = new Set<number>();
-    part.forEach((it, k) => {
-      const unfinished =
-        (it.t === "approval" && !resolved.has(String(it.id))) || // a card waiting for you
-        (it.t === "msg" && it.open === "stopped" && it.seq > lastMine) || // stopped, and you haven't written since
-        (it.t === "msg" && waiting.has(it.seq) && it.seq > lastMine); // waits for your reply, and you haven't written
-      if (!unfinished) return;
-      open.add(it.seq);
-      const before = part[k - 1]; // what you asked, so the open item makes sense on its own
-      if (before?.t === "msg" && before.role === "me") open.add(before.seq);
-    });
-    const notes = part.flatMap((it): Note[] => {
-      if (it.t !== "msg" || !it.task || typeof it.task !== "object") return [];
-      const { kind, title } = it.task as { kind?: unknown; title?: unknown };
-      return [{ kind: NOTE_KINDS.includes(String(kind)) ? String(kind) : "update", title: typeof title === "string" ? title : "", text: String(it.text ?? "") }];
-    });
-    const started = part
-      .filter((it) => it.t === "approval" && it.kind === "task")
-      .map((it) => {
-        const fields = Array.isArray(it.fields) ? (it.fields as { value?: unknown }[]) : [];
-        return { id: String(it.id), ts: it.ts, title: String(fields[0]?.value ?? "") }; // "Waiting for"
-      });
-    const n = typeof covering?.n === "number" ? covering.n : undefined;
-    return { first, last, ts: part[0].ts, title: String(named?.text ?? "") || firstWords(part), n, folded: !live, open, notes, started };
-  });
+  return out;
 }
 
-/** A fold line's time: HH:MM, on its right, under its day's heading. */
-export function foldTime(p: Part): string {
-  return new Date(p.ts * 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+/** The topics, oldest to newest by their last message. `resolved`: the approval ids that have a state. */
+export function topicsOf(all: Item[], synced: Map<number, TopicMeta>, resolved: Set<string>): Topic[] {
+  const meta = metaOf(all, synced);
+  const by = new Map<number, Item[]>();
+  for (const it of [...all].sort((a, b) => a.seq - b.seq)) {
+    if (!shown(it)) continue;
+    const n = typeof it.topic === "number" ? it.topic : 0;
+    by.set(n, [...(by.get(n) ?? []), it]);
+  }
+  const out: Topic[] = [];
+  for (const [n, items] of by) {
+    const m = meta.get(n);
+    const said = items.filter((it) => it.t === "msg");
+    const last = Math.max(...(said.length ? said : items).map((it) => it.ts));
+    const unanswered = items.some((it) => it.t === "approval" && !resolved.has(String(it.id)));
+    out.push({
+      n,
+      items,
+      title: m?.title || firstWords(items),
+      state: m?.state ?? "",
+      question: m?.question ?? "",
+      schedule: m?.schedule,
+      last,
+      needsInput: m?.state === "waiting" || unanswered,
+    });
+  }
+  return out.sort((a, b) => a.last - b.last || a.n - b.n);
+}
+
+/** The groups the chat shows, in order: each day's topics (by their last message), then Needs input. */
+export function groups(list: Topic[], day: (ts: number) => string): { label: string; topics: Topic[] }[] {
+  const out: { label: string; topics: Topic[] }[] = [];
+  for (const t of list.filter((t) => !t.needsInput)) {
+    const label = day(t.last);
+    if (out[out.length - 1]?.label === label) out[out.length - 1].topics.push(t);
+    else out.push({ label, topics: [t] });
+  }
+  const waiting = list.filter((t) => t.needsInput);
+  if (waiting.length) out.push({ label: "Needs input", topics: waiting });
+  return out;
+}
+
+/** A topic line's time: HH:MM of its last message. */
+export function lineTime(ts: number): string {
+  return new Date(ts * 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 /** A day's heading in the chat (SPEC §7.4 "Folding"): "Today", "Yesterday", "Last week · <date>" for the five days

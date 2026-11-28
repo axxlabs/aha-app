@@ -21,6 +21,7 @@ export interface Queued {
   text: string;
   ts: number;
   image?: Photo;
+  topic?: number; // the topic it was typed in (SPEC §4.1); none: it starts a new one
 }
 
 export interface Item {

@@ -1,42 +1,47 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Axxlabs Limited
-// The chat view (SPEC §7.4). `items` is the only state; draw() derives everything shown from it: the parts of the
-// chat and their fold lines, day labels, what stays open, and what's being sent. Each item's element is made once
-// and kept, so a card keeps what's typed in it. Everything else only changes the state and calls invalidate().
-import { type Part, foldTime, plan, shown } from "./fold";
+// The chat view (SPEC §4.1, §7.4). `items` is the only state; draw() derives everything shown from it: the topics,
+// oldest to newest by their last message, grouped by day, then Needs input; one topic open at a time, with the
+// composer inside it; the rest one line each. Each item's element is made once and kept, so a card keeps what's
+// typed in it. Everything else only changes the state and calls invalidate().
+import { type Schedule, type Topic, type TopicMeta, isBreak, lineTime, groups, topicsOf } from "./fold";
 import type { Item } from "./store";
 
 export interface ViewDeps {
   col: HTMLElement; // where the chat goes
   scroller: HTMLElement; // what scrolls
-  working: HTMLElement; // "sha is working…", always last
+  working: HTMLElement; // "sha is working…", in the topic it works in
+  composer: HTMLElement; // the message box: inside the open topic, or in `footer` for a new topic
+  footer: HTMLElement; // the bar at the bottom: shown only when every topic is collapsed
   node(it: Item): HTMLElement | null; // an item's element (null: not shown)
   resolve(it: Item, state: string): void; // show a card's answer on its element
   dayLabel(ts: number): string;
-  busy(): boolean; // a task is running: the part going on doesn't fold
-  marks?(p: Part, states: Map<string, string>): Node[]; // small icons on a folded part's line (its background tasks)
-  cut?: HTMLElement; // [close current conversation into new topic]: shown while there's a part going on
-  collapseAll?: HTMLElement; // [collapse all]: shown while a folded part is open; folds them all again
-  actions?: HTMLElement; // the row holding both, last in the chat, under the latest message (when one shows)
+  busy(): boolean; // a request or wakeup is running
+  busyTopic(): number; // the topic it works in (0: not known)
+  strip?(n: number, s: Schedule): HTMLElement; // a scheduled topic's strip (SPEC §4.1)
+  background?: HTMLElement; // "Continue in background": shown in the open topic while sha works on it
+  opened?(n: number | null): void; // the open topic changed (the composer's placeholder)
   now?: () => number; // seconds (tests)
   frame?: (fn: () => void) => void; // requestAnimationFrame (tests: run now)
 }
 
-
 export function chatView(d: ViewDeps) {
   const items = new Map<number, Item>();
   const els = new Map<number, HTMLElement>();
-  const pending = new Map<string, HTMLElement>(); // sent from here, not echoed back yet
-  const expanded = new Set<number>(); // folded parts the person opened, by their first item
-  const foldLines = new Map<number, HTMLElement>();
-  const dayLines = new Map<string, HTMLElement>();
+  const pending = new Map<string, { el: HTMLElement; topic: number }>(); // sent from here, not echoed back yet
+  const lines = new Map<number, HTMLElement>(); // each topic's line
+  const boxes = new Map<number, HTMLElement>(); // the open topic's box
+  const strips = new Map<number, { key: string; el: HTMLElement }>();
+  const heads = new Map<string, HTMLElement>();
   const answered = new Set<number>(); // cards already shown as answered
+  const synced = new Map<number, TopicMeta>(); // the sync's list of topics (SPEC §6.5)
   const now = d.now ?? (() => Date.now() / 1000);
   const frame = d.frame ?? ((fn: () => void) => requestAnimationFrame(fn));
+  let open: number | null = null;
+  let chosen = false; // the person opened or closed a topic: no default open any more
   let queued = false;
   let wantBottom = false;
-  let scrollTo: number | null = null; // a fold line just opened: scroll it to the top on the next draw
-  let reveal: number | null = null; // a message to bring into view on the next draw (the Tasks panel's link)
+  let scrollTo: number | null = null; // a topic just opened: its line comes to the top on the next draw
 
   const atBottom = () => d.scroller.scrollHeight - d.scroller.scrollTop - d.scroller.clientHeight < 80;
   const toBottom = () => (d.scroller.scrollTop = d.scroller.scrollHeight);
@@ -53,44 +58,146 @@ export function chatView(d: ViewDeps) {
     return el;
   }
 
-  // A row acting as a button, not a <button>: its icons are buttons of their own (their popups), and a button
-  // can't hold buttons.
-  function foldLine(first: number): HTMLElement {
-    let line = foldLines.get(first);
-    if (!line) {
-      line = document.createElement("div");
-      line.className = "fold";
-      line.setAttribute("role", "button");
-      line.tabIndex = 0;
+  function setOpen(n: number | null): void {
+    if (n === open) return;
+    open = n;
+    if (n !== null) scrollTo = n;
+    d.opened?.(n);
+    invalidate(n === null);
+  }
+
+  function head(label: string): HTMLElement {
+    let el = heads.get(label);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = label === "Needs input" ? "day needs" : "day";
+      el.textContent = label;
+      heads.set(label, el);
+    }
+    return el;
+  }
+
+  /** A topic's state, as one icon on its line (SPEC §4.1 "Icons"). */
+  function stateIcon(t: Topic): HTMLElement | null {
+    const span = (cls: string, text: string, label: string) => {
+      const el = document.createElement("span");
+      el.className = `state-icon ${cls}`;
+      el.textContent = text;
+      el.title = label;
+      el.setAttribute("aria-label", label);
+      return el;
+    };
+    if (d.busy() && d.busyTopic() === t.n) return span("running", "•••", "sha is working on it");
+    if (t.needsInput) return span("waiting", "●", "Waiting on you");
+    if (t.state === "scheduled" && t.schedule) {
+      return span("scheduled", t.schedule.paused ? "⏱" : `⏱ ${lineTime(t.schedule.next)}`, "Checks on its own");
+    }
+    if (t.state === "done") return span("done", "✓", "Done");
+    if (t.state === "failed") return span("failed", "!", "Couldn't be done");
+    return null;
+  }
+
+  function line(t: Topic): HTMLElement {
+    let el = lines.get(t.n);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "fold";
+      el.setAttribute("role", "button");
+      el.tabIndex = 0;
+      const n = t.n;
       const toggle = () => {
-        if (expanded.has(first)) expanded.delete(first);
-        else {
-          expanded.add(first);
-          scrollTo = first; // opened: its start comes to the top, to read it from the beginning
-        }
-        invalidate();
+        chosen = true;
+        setOpen(open === n ? null : n);
       };
-      line.onclick = toggle;
-      line.onkeydown = (e) => {
-        if (e.target === line && (e.key === "Enter" || e.key === " ")) {
+      el.onclick = toggle;
+      el.onkeydown = (e) => {
+        if (e.target === el && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
           toggle();
         }
       };
-      foldLines.set(first, line);
+      lines.set(t.n, el);
     }
-    return line;
+    const isOpen = open === t.n;
+    const chevron = document.createElement("span");
+    chevron.className = "chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = isOpen ? "▾" : "▸";
+    const num = document.createElement("span"); // its number, to ask sha about it ("topic 12")
+    num.className = "num";
+    num.textContent = t.n ? String(t.n) : "";
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = t.title;
+    const time = document.createElement("time");
+    time.textContent = lineTime(t.last);
+    const icon = stateIcon(t);
+    el.replaceChildren(chevron, ...(t.n ? [num] : []), title, ...(icon ? [icon] : []), time);
+    if (t.needsInput && t.question && !isOpen) {
+      const q = document.createElement("span");
+      q.className = "question";
+      q.textContent = t.question;
+      el.append(q);
+    }
+    el.classList.toggle("open", isOpen);
+    el.setAttribute("aria-label", `${t.n ? `Topic ${t.n}: ` : ""}${t.title} · ${time.textContent}`);
+    el.setAttribute("aria-expanded", String(isOpen));
+    return el;
   }
 
-  function dayLine(day: string): HTMLElement {
-    let el = dayLines.get(day);
-    if (!el) {
-      el = document.createElement("div");
-      el.className = "day";
-      el.textContent = day;
-      dayLines.set(day, el);
+  function stripFor(t: Topic): HTMLElement | null {
+    if (!t.schedule || !d.strip) return null;
+    const key = JSON.stringify(t.schedule);
+    let s = strips.get(t.n);
+    if (!s || s.key !== key) {
+      s = { key, el: d.strip(t.n, t.schedule) };
+      strips.set(t.n, s);
     }
+    return s.el;
+  }
+
+  function box(t: Topic, states: Map<string, string>): HTMLElement {
+    let el = boxes.get(t.n);
+    if (!el) {
+      el = document.createElement("section");
+      el.className = "topic-box";
+      boxes.set(t.n, el);
+    }
+    const want: Node[] = [line(t)];
+    const strip = stripFor(t);
+    if (strip) want.push(strip);
+    for (const it of t.items) {
+      const node = elementFor(it);
+      if (!node) continue;
+      want.push(node);
+      const state = it.t === "approval" ? states.get(String(it.id)) : undefined;
+      if (state && !answered.has(it.seq)) {
+        answered.add(it.seq);
+        d.resolve(it, state);
+      }
+    }
+    for (const p of pending.values()) if (p.topic === t.n) want.push(p.el);
+    const working = d.busy() && d.busyTopic() === t.n;
+    if (working) want.push(d.working);
+    if (working && d.background) want.push(d.background);
+    want.push(d.composer);
+    place(el, want);
     return el;
+  }
+
+  /** Put `want` in `parent`, in order, moving only what's out of place, so a card being typed into keeps its
+   * focus. */
+  function place(parent: HTMLElement, want: Node[]): void {
+    let cur = parent.firstChild;
+    for (const n of want) {
+      if (n === cur) cur = cur.nextSibling;
+      else parent.insertBefore(n, cur);
+    }
+    while (cur) {
+      const next = cur.nextSibling;
+      cur.remove();
+      cur = next;
+    }
   }
 
   function draw(): void {
@@ -98,89 +205,41 @@ export function chatView(d: ViewDeps) {
     const stick = wantBottom || atBottom();
     wantBottom = false;
     const fromBottom = d.scroller.scrollHeight - d.scroller.scrollTop;
-    const all = [...items.values()].sort((a, b) => a.seq - b.seq);
+    const all = [...items.values()];
     const states = new Map(all.filter((it) => it.t === "approval_state").map((it) => [String(it.id), String(it.state)]));
+    const list = topicsOf(all, synced, new Set(states.keys()));
     const t = now();
-    const chat = all.filter(shown);
+    // Until the person chooses, the newest topic is open while it's going on (no break since its last message).
+    if (!chosen) {
+      const newest = list[list.length - 1];
+      const going = newest && (!isBreak(newest.last, t) || (d.busy() && d.busyTopic() === newest.n));
+      const want = going ? newest.n : null;
+      if (want !== open) {
+        open = want;
+        d.opened?.(open);
+      }
+    }
+    if (open !== null && !list.some((x) => x.n === open) && ![...pending.values()].some((p) => p.topic === open)) {
+      open = null; // its history was cleared
+      d.opened?.(null);
+    }
     const want: Node[] = [];
-    let lastDay = "";
-    let at = 0;
-    const parts = plan(all, new Set(states.keys()), t, d.busy());
-    if (d.cut) d.cut.hidden = !parts.length || parts[parts.length - 1].folded;
-    if (d.collapseAll) d.collapseAll.hidden = !parts.some((p) => p.folded && expanded.has(p.first));
-    for (const p of parts) {
-      const open = expanded.has(p.first);
-      if (p.folded) {
-        // Days head the chat, at its left; under each, its topics, one line each: the title, its icons, the time.
-        const day = d.dayLabel(p.ts);
-        if (day !== lastDay) want.push(dayLine(day));
-        lastDay = day;
-        const line = foldLine(p.first);
-        const chevron = document.createElement("span");
-        chevron.className = "chevron";
-        chevron.setAttribute("aria-hidden", "true");
-        chevron.textContent = open ? "▾" : "▸";
-        const title = document.createElement("span");
-        title.className = "title";
-        title.textContent = p.title;
-        const num = document.createElement("span"); // its number, to ask sha about it ("topic 12")
-        num.className = "num";
-        num.textContent = p.n ? String(p.n) : "";
-        const marks = document.createElement("span");
-        marks.className = "marks";
-        marks.append(...(d.marks?.(p, states) ?? []));
-        const time = document.createElement("time");
-        time.textContent = foldTime(p);
-        line.replaceChildren(chevron, ...(p.n ? [num] : []), title, marks, time);
-        line.setAttribute("aria-label", `${p.n ? `Topic ${p.n}: ` : ""}${p.title} · ${day} ${time.textContent}`);
-        line.setAttribute("aria-expanded", String(open));
-        want.push(line);
-      }
-      while (at < chat.length && chat[at].seq <= p.last) {
-        const it = chat[at++];
-        if (p.folded && !open && !p.open.has(it.seq)) continue;
-        const el = elementFor(it);
-        if (!el) continue;
-        const day = d.dayLabel(it.ts);
-        if (day !== lastDay) want.push(dayLine(day));
-        lastDay = day;
-        want.push(el);
-        const state = it.t === "approval" ? states.get(String(it.id)) : undefined;
-        if (state && !answered.has(it.seq)) {
-          answered.add(it.seq);
-          d.resolve(it, state);
-        }
-      }
+    for (const g of groups(list, d.dayLabel)) {
+      want.push(head(g.label));
+      for (const topic of g.topics) want.push(topic.n === open ? box(topic, states) : line(topic));
     }
-    want.push(...pending.values(), d.working);
-    if (d.actions) {
-      if ((d.cut && !d.cut.hidden) || (d.collapseAll && !d.collapseAll.hidden)) want.push(d.actions);
-    } else if (d.cut && !d.cut.hidden) want.push(d.cut);
-    // Move only what's out of place, so a card being typed into keeps its focus.
-    let cur = d.col.firstChild;
-    for (const n of want) {
-      if (n === cur) cur = cur.nextSibling;
-      else d.col.insertBefore(n, cur);
+    const fresh = [...pending.values()].filter((p) => !p.topic || !list.some((x) => x.n === p.topic));
+    want.push(...fresh.map((p) => p.el));
+    if (d.busy() && (open === null || d.busyTopic() !== open) && !list.some((x) => x.n === d.busyTopic())) {
+      want.push(d.working); // working on something not drawn yet (a new topic)
     }
-    while (cur) {
-      const next = cur.nextSibling;
-      cur.remove();
-      cur = next;
-    }
-    const opened = scrollTo === null ? undefined : foldLines.get(scrollTo);
+    place(d.col, want);
+    if (open === null && d.composer.parentElement !== d.footer) d.footer.append(d.composer);
+    d.footer.hidden = open !== null;
+    const opened = scrollTo === null ? undefined : lines.get(scrollTo);
     scrollTo = null;
-    const shownEl = reveal === null ? undefined : els.get(reveal);
-    reveal = null;
-    if (shownEl && d.col.contains(shownEl)) {
-      // In the middle of the screen, marked for a moment, so the eye finds it.
-      d.scroller.scrollTop += shownEl.getBoundingClientRect().top - d.scroller.getBoundingClientRect().top - d.scroller.clientHeight / 3;
-      shownEl.classList.add("revealed");
-      setTimeout(() => shownEl.classList.remove("revealed"), 2000);
-    } else if (opened?.isConnected) {
-      // The day above it too, when it's the first of its day, so the line keeps its heading in view.
-      const prev = opened.previousElementSibling as HTMLElement | null;
-      const top = prev?.classList.contains("day") ? prev : opened;
-      d.scroller.scrollTop += top.getBoundingClientRect().top - d.scroller.getBoundingClientRect().top - 8;
+    if (opened?.isConnected) {
+      d.scroller.scrollTop += opened.getBoundingClientRect().top - d.scroller.getBoundingClientRect().top - 8;
     } else if (stick) toBottom();
     else d.scroller.scrollTop = d.scroller.scrollHeight - fromBottom; // what's on screen stays put
   }
@@ -199,29 +258,33 @@ export function chatView(d: ViewDeps) {
     invalidate,
     toBottom,
     atBottom,
-    /** [collapse all]: every folded part the person opened folds again; the chat's end comes back in view. */
-    collapseAll(): void {
-      expanded.clear();
-      invalidate(true);
+    /** The topic open now (where a message goes), or null: a message starts a new topic. */
+    opened: () => open,
+    /** Open topic n (or collapse every topic, null). */
+    open(n: number | null): void {
+      chosen = true;
+      setOpen(n);
     },
-    /** Bring item `seq` into view: its topic opens if folded (SPEC §7.4, the Tasks panel's last message). False
-     * when this device doesn't have it. */
-    reveal(seq: number): boolean {
-      if (!items.has(seq)) return false;
-      const all = [...items.values()];
-      const resolved = new Set(all.filter((it) => it.t === "approval_state").map((it) => String(it.id)));
-      const part = plan(all, resolved, now(), d.busy()).find((p) => p.first <= seq && seq <= p.last);
-      if (part?.folded) expanded.add(part.first);
-      reveal = seq;
+    /** The sync's list of topics: their titles and states, whatever the device keeps (SPEC §4.1). */
+    topics(list: TopicMeta[]): void {
+      for (const m of list) if (typeof m.topic === "number") synced.set(m.topic, m);
       invalidate();
-      return true;
     },
     /** Items in (live, synced, older history, the cache). */
     add(list: Item[]): void {
       for (const it of list) {
         if (typeof it.seq !== "number" || items.has(it.seq)) continue;
         items.set(it.seq, it);
-        if (it.t === "msg" && it.role === "me" && typeof it.cid === "string") pending.delete(it.cid); // echoed back
+        if (it.t === "msg" && it.role === "me" && typeof it.cid === "string") {
+          const p = pending.get(it.cid);
+          pending.delete(it.cid); // echoed back
+          // A message sent with every topic collapsed started a topic: it's the open one now.
+          if (p && !p.topic && typeof it.topic === "number") {
+            chosen = true;
+            open = it.topic;
+            d.opened?.(open);
+          }
+        }
       }
       invalidate();
     },
@@ -233,15 +296,14 @@ export function chatView(d: ViewDeps) {
         els.delete(seq);
         answered.delete(seq);
       }
-      expanded.clear();
       invalidate();
     },
-    /** A message sent from here, until the computer echoes it back. */
-    sending(cid: string, el: HTMLElement): void {
-      pending.set(cid, el);
+    /** A message sent from here, until the computer echoes it back; `topic`: where it was sent (0: a new one). */
+    sending(cid: string, el: HTMLElement, topic = 0): void {
+      pending.set(cid, { el, topic });
       invalidate(true);
     },
-    pendingEntries: () => pending.entries(),
+    pendingEntries: () => [...pending.entries()].map(([cid, p]) => [cid, p.el] as [string, HTMLElement]),
     /** Make these items' elements again on the next draw (e.g. the accounts shown as labels changed). */
     remake(which: (it: Item) => boolean): void {
       for (const [seq, it] of items) if (which(it)) els.delete(seq);

@@ -7,20 +7,26 @@ import { chatView } from "../src/view";
 
 const T = new Date(2026, 10, 24, 10, 0).getTime() / 1000;
 let n = 0;
-const me = (ts: number, text: string) => ({ seq: ++n, ts, t: "msg", role: "me", text }) as Item;
-const aha = (ts: number, text: string, extra: Record<string, unknown> = {}) => ({ seq: ++n, ts, t: "msg", role: "aha", text, ...extra }) as Item;
+const me = (topic: number, ts: number, text: string, extra: Record<string, unknown> = {}) => ({ seq: ++n, ts, t: "msg", role: "me", text, topic, ...extra }) as Item;
+const aha = (topic: number, ts: number, text: string) => ({ seq: ++n, ts, t: "msg", role: "aha", text, topic }) as Item;
 
-function setup(now = T + 600) {
+function setup(now = T + 600, busyTopic = 0) {
   n = 0;
   const col = document.createElement("div");
   const scroller = document.createElement("main");
   const working = document.createElement("div");
   working.className = "working";
+  const composer = document.createElement("form");
+  composer.className = "composer-in";
+  const footer = document.createElement("footer");
+  const opened: (number | null)[] = [];
   let made = 0;
   const view = chatView({
     col,
     scroller,
     working,
+    composer,
+    footer,
     node: (it) => {
       if (it.t !== "msg" && it.t !== "approval") return null;
       made++;
@@ -30,94 +36,105 @@ function setup(now = T + 600) {
       if (it.t === "approval") el.append(document.createElement("input"));
       return el;
     },
-    resolve: (it, st) => it.t === "approval" && document.body && void 0,
+    resolve: () => undefined,
     dayLabel: (ts) => new Date(ts * 1000).toDateString(),
-    busy: () => false,
+    busy: () => busyTopic > 0,
+    busyTopic: () => busyTopic,
+    opened: (x) => opened.push(x),
     now: () => now,
     frame: (fn) => fn(), // draw at once
   });
-  const shown = () => [...col.children].map((el) => (el.className === "fold" ? `▸${el.querySelector(".title")?.textContent}` : el.className === "day" ? "day" : el.textContent ?? "")).filter((x) => x !== "day" && x !== "");
-  return { col, view, shown, made: () => made };
+  /** What the chat shows: ▸title for a collapsed topic, ▾title for the open one, then its messages. */
+  const shown = () =>
+    [...col.querySelectorAll(".fold, .me, .aha, .card, .composer-in")].map((el) =>
+      el.classList.contains("fold") ? `${el.classList.contains("open") ? "▾" : "▸"}${el.querySelector(".title")?.textContent}` : el.classList.contains("composer-in") ? "[composer]" : (el.textContent ?? ""),
+    );
+  return { col, view, shown, footer, composer, opened, made: () => made };
 }
 
-describe("the chat view (SPEC §7.4)", () => {
-  it("folds the part before a new subject as soon as its title arrives, live", () => {
-    const { view, shown } = setup();
-    const a = [me(T, "order rice"), aha(T + 5, "done")];
-    view.add(a);
-    view.add([{ seq: ++n, ts: T + 6, t: "title", from: a[0].seq, text: "Rice order" } as Item]);
-    expect(shown()).toEqual(["order rice", "done"]); // still going on: no fold
-    const b = [me(T + 60, "new topic: who is X"), aha(T + 65, "X is …")];
-    view.add(b);
-    expect(shown()).toEqual(["order rice", "done", "new topic: who is X", "X is …"]); // no title yet: one part
-    view.add([{ seq: ++n, ts: T + 66, t: "title", from: b[0].seq, text: "Who is X", new: true } as Item]);
-    expect(shown()).toEqual(["▸Rice order", "new topic: who is X", "X is …"]); // folded the moment it arrived
+describe("the chat view (SPEC §4.1, §7.4)", () => {
+  it("opens the topic going on, with the composer inside it; the bar at the bottom hides", () => {
+    const { view, shown, footer } = setup();
+    view.add([me(1, T - 3 * 3600, "old one"), aha(1, T - 3 * 3600 + 60, "done"), me(2, T, "order rice"), aha(2, T + 5, "ordered")]);
+    expect(shown()).toEqual(["▸old one", "▾order rice", "order rice", "ordered", "[composer]"]);
+    expect(view.opened()).toBe(2);
+    expect(footer.hidden).toBe(true);
   });
 
-  it("heads each day's topics with the day, once, and each line has its title and time apart", () => {
-    const { view, col } = setup(T + 2 * 86400);
-    view.add([me(T, "first"), aha(T + 60, "a"), me(T + 3 * 3600, "second"), aha(T + 3 * 3600 + 60, "b"), me(T + 86400, "third")]);
-    const order = [...col.children].map((el) => el.className);
-    expect(order).toEqual(["day", "fold", "fold", "day", "fold", "working"]);
-    const line = col.querySelector(".fold") as HTMLElement;
-    expect(line.querySelector(".title")?.textContent).toBe("first");
-    expect(line.querySelector("time")?.textContent).toMatch(/10:00|10:00\s?AM/);
+  it("after a break nothing is open: the composer is at the bottom, for a new topic", () => {
+    const { view, shown, footer, composer } = setup(T + 4 * 3600);
+    view.add([me(1, T, "order rice"), aha(1, T + 5, "ordered")]);
+    expect(shown()).toEqual(["▸order rice"]);
+    expect(view.opened()).toBe(null);
+    expect(footer.hidden).toBe(false);
+    expect(composer.parentElement).toBe(footer);
   });
 
-  it("goes to a message: its folded topic opens and the message is marked (the Tasks panel's link)", () => {
+  it("one topic open at a time: opening one closes the other, and its line closes it", () => {
     const { view, shown, col } = setup();
-    const a = [me(T, "order rice"), aha(T + 5, "Task done: rice delivered")];
-    view.add(a);
-    const b = [me(T + 60, "who is X"), aha(T + 65, "X is …")];
-    view.add(b);
-    view.add([{ seq: ++n, ts: T + 66, t: "title", from: b[0].seq, text: "Who is X", new: true } as Item]);
-    view.add([{ seq: ++n, ts: T + 6, t: "title", from: a[0].seq, text: "Rice order" } as Item]);
-    expect(shown()[0]).toBe("▸Rice order");
-    expect(view.reveal(a[1].seq)).toBe(true);
-    expect(shown()).toContain("Task done: rice delivered");
-    expect([...col.querySelectorAll(".revealed")].map((el) => el.textContent)).toEqual(["Task done: rice delivered"]);
-    expect(view.reveal(9999)).toBe(false); // not on this device
+    view.add([me(1, T - 60, "first"), me(2, T, "second")]);
+    expect(view.opened()).toBe(2);
+    (col.querySelector(".fold") as HTMLElement).click(); // topic 1's line
+    expect(view.opened()).toBe(1);
+    expect(shown()).toEqual(["▾first", "first", "[composer]", "▸second"]);
+    (col.querySelector(".fold.open") as HTMLElement).click();
+    expect(view.opened()).toBe(null);
   });
 
-  it("[collapse all] shows while a folded topic is open, and folds them all again", () => {
-    const { view, col } = setup(T + 2 * 86400);
-    view.add([me(T, "first"), aha(T + 60, "a"), me(T + 3 * 3600, "second"), aha(T + 3 * 3600 + 60, "b")]);
-    expect(col.querySelectorAll(".fold").length).toBe(2);
-    (col.querySelector(".fold") as HTMLButtonElement).click();
-    expect([...col.children].some((el) => el.textContent === "a")).toBe(true);
-    view.collapseAll();
-    expect([...col.children].some((el) => el.textContent === "a")).toBe(false);
+  it("a message sent with every topic collapsed opens the topic it started, once echoed", () => {
+    const { view, opened } = setup(T + 4 * 3600);
+    view.add([me(1, T, "old")]);
+    const el = document.createElement("div");
+    view.sending("c1", el, 0);
+    view.add([me(2, T + 4 * 3600, "new thing", { cid: "c1" })]);
+    expect(view.opened()).toBe(2);
+    expect(opened.at(-1)).toBe(2);
   });
 
-  it("clearing history leaves nothing behind: no fold lines, no days", () => {
-    const { view, col, shown } = setup(T + 7 * 3600);
-    view.add([me(T, "old"), aha(T + 5, "old answer"), me(T + 4 * 3600, "later"), aha(T + 4 * 3600 + 5, "later answer")]);
-    expect(shown()).toEqual(["▸old", "▸later"]);
-    view.dropBefore(100);
-    expect(shown()).toEqual([]);
-    expect(col.querySelectorAll(".fold, .day, [data-seq]").length).toBe(0);
+  it("a topic waiting on you is under Needs input, at the bottom, with its question", () => {
+    const { view, col } = setup(T + 4 * 3600);
+    view.add([me(1, T, "dinner with Natalia"), me(2, T + 60, "weather")]);
+    view.add([{ seq: ++n, ts: T + 120, t: "topic", topic: 1, title: "Dinner", state: "waiting", question: "She offered 17:00. OK?" } as Item]);
+    const heads = [...col.querySelectorAll(".day")].map((d) => d.textContent);
+    expect(heads.at(-1)).toBe("Needs input");
+    const last = [...col.querySelectorAll(".fold")].at(-1) as HTMLElement;
+    expect(last.querySelector(".title")?.textContent).toBe("Dinner");
+    expect(last.querySelector(".question")?.textContent).toBe("She offered 17:00. OK?");
+    expect(last.querySelector(".state-icon.waiting")).not.toBeNull();
   });
 
-  it("opening a fold line shows its part; a card keeps its element (and what's typed) across draws", () => {
-    const { view, col, shown, made } = setup(T + 5 * 3600);
-    const card = { seq: 0, ts: T + 10, t: "approval", id: "a1", text: "card" } as Item;
-    const ask = me(T, "book it");
+  it("shows a scheduled topic's next wake on its line", () => {
+    const { view, col } = setup(T + 4 * 3600);
+    view.add([me(1, T, "parcel")]);
+    view.topics([{ topic: 1, title: "Parcel", state: "scheduled", schedule: { waiting_for: "Parcel", prompt: "x", done_when: "delivered", every: 1800, next: T + 5 * 3600, checks: 2, paused: false } }]);
+    expect(col.querySelector(".state-icon.scheduled")?.textContent).toMatch(/^⏱ \d/);
+  });
+
+  it("a card keeps its element (and what's typed) across draws", () => {
+    const { view, col, made } = setup();
+    const card = { seq: 0, ts: T + 10, t: "approval", id: "a1", text: "card", topic: 1 } as Item;
+    const ask = me(1, T, "book it");
     card.seq = ++n;
     view.add([ask, card]);
-    expect(shown()).toEqual(["▸book it", "book it", "card"]); // folded, but the card waiting for you stays open
     const input = col.querySelector("input") as HTMLInputElement;
     input.value = "typed";
-    (col.querySelector(".fold") as HTMLButtonElement).click();
+    const count = made();
+    view.add([aha(1, T + 20, "more")]);
     expect(col.querySelector("input")).toBe(input);
     expect(input.value).toBe("typed");
-    const count = made();
-    view.add([aha(T + 5 * 3600 - 10, "unrelated")]);
     expect(made()).toBe(count + 1); // only the new item's element was made
+  });
+
+  it("drops what's before the history's start", () => {
+    const { view, col } = setup();
+    view.add([me(1, T, "old")]);
+    view.dropBefore(100);
+    expect(col.querySelectorAll(".fold, [data-seq]").length).toBe(0);
   });
 
   it("remake draws chosen items again (labels after the accounts arrive)", () => {
     const { view, col } = setup();
-    view.add([aha(T, "in fe@example.com")]);
+    view.add([aha(1, T, "in fe@example.com")]);
     const before = col.querySelector("[data-seq]");
     view.remake((it) => it.role === "aha");
     expect(col.querySelector("[data-seq]")).not.toBe(before);

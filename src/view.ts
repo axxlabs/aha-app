@@ -168,6 +168,7 @@ export function chatView(d: ViewDeps) {
       boxes.set(t.n, el);
     }
     const want: Node[] = [line(t)];
+    if (d.remove && t.n) want.push(remover(t.n)); // at its top, under its line
     const strip = stripFor(t);
     if (strip) want.push(strip);
     for (const it of t.items) {
@@ -185,7 +186,6 @@ export function chatView(d: ViewDeps) {
     if (working) want.push(d.working);
     if (working && d.background) want.push(d.background);
     want.push(d.composer);
-    if (d.remove && t.n) want.push(remover(t.n));
     place(el, want);
     return el;
   }

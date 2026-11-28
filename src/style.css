@@ -342,6 +342,6 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
   background: var(--card); color: inherit; resize: vertical; }
 .strip .task-edit .error { color: var(--warn); margin: 0; }
 .strip .task-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.topic-box > .remove { align-self: flex-end; margin-top: -8px; }
+.topic-box > .remove { align-self: flex-end; margin: -14px 0 -6px; }
 .topic-box > .remove:hover, .topic-box > .remove:focus-visible { color: var(--warn); }
 .aha .msg-time { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }

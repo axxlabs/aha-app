@@ -309,7 +309,6 @@ code.fp { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; letter-
   padding: 8px 12px 12px; background: var(--bg); }
 .topic-box > .fold { margin: 0 -6px; }
 .topic-box > .act + .act { margin-top: -15px; }
-.topic-box > .cut { align-self: flex-start; margin-top: -8px; }
 .fold.open .title { font-weight: 700; }
 .fold { flex-wrap: wrap; }
 .fold .question { flex-basis: 100%; padding-left: 18px; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

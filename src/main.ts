@@ -241,9 +241,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
   // The message box: inside the open topic, or at the bottom for a new topic (SPEC §4.1 "Routing").
   const composer = h("div", { class: "composer-in" }, attachment, form);
   const footer = h("footer", { class: "composer" }, composer);
-  // While sha works on the open topic: let it carry on, and free the chat for another topic (SPEC §4.1).
-  const backgroundBtn = h("button", { class: "cut", type: "button", title: "sha carries on; what you write next starts a new topic" }, "Continue in background");
-  backgroundBtn.onclick = () => view.open(null);
   // Safari deletes a non-installed site's storage after 7 days without a visit, and the pairing with it (SPEC §9.2).
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const installed = matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
@@ -276,7 +273,6 @@ async function chat(store: Store, identity: Identity): Promise<void> {
     busyTopic: () => busyTopic,
     waking: () => wakingTopic,
     strip: (n, sched) => scheduleStrip(client, n, sched, () => client.settings.dates ?? "short"),
-    background: backgroundBtn,
     remove(n) {
       if (!confirm(`Delete topic #${n}? Its messages go from your computer and all your devices, and it stops anything it was checking on.`)) return;
       void client.send({ t: "topic_delete", topic: n });

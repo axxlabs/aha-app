@@ -20,7 +20,6 @@ export interface ViewDeps {
   busyTopic(): number; // the topic it works in (0: not known)
   waking?(): number; // a topic that woke up on its own and works now (0: none): its line shows it, nothing else
   strip?(n: number, s: Schedule): HTMLElement; // a scheduled topic's strip (SPEC §4.1)
-  background?: HTMLElement; // "Continue in background": shown in the open topic while sha works on it
   remove?(n: number): void; // the open topic's Delete topic (SPEC §4.1)
   opened?(n: number | null): void; // the open topic changed (the composer's placeholder)
   now?: () => number; // seconds (tests)
@@ -184,7 +183,6 @@ export function chatView(d: ViewDeps) {
     for (const p of pending.values()) if (p.topic === t.n) want.push(p.el);
     const working = d.busy() && d.busyTopic() === t.n;
     if (working) want.push(d.working);
-    if (working && d.background) want.push(d.background);
     want.push(d.composer);
     place(el, want);
     return el;
